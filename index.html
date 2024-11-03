@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Maze Game</title>
+  <title>SMAZE</title>
   <style>
     body { text-align: center; }
     canvas { border: 1px solid black; }
@@ -33,10 +33,73 @@
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
       z-index: 1000;
     }
+
+    :root {
+      --font-heading: 'Outfit', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --color-text: #c9d1d9;
+      --color-heading: #58a6ff;
+      --color-accent: #7ee787;
+    }
+
+    body {
+      font-family: var(--font-heading);
+      color: var(--color-text);
+      letter-spacing: 0.02em;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 600;
+      color: var(--color-heading);
+      text-shadow: 0 0 15px rgba(88, 166, 255, 0.5);
+      margin-bottom: 1.5rem;
+    }
+
+    #controls {
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+    }
+
+    button {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    #timer {
+      font-family: var(--font-mono);
+      font-size: 2rem;
+      color: var(--color-heading);
+      text-shadow: 0 0 10px rgba(88, 166, 255, 0.4);
+    }
+
+    #message {
+      font-family: var(--font-heading);
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--color-accent);
+      text-shadow: 0 0 20px rgba(126, 231, 135, 0.5);
+    }
+
+    select, input {
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+    }
+
+    label {
+      font-family: var(--font-mono);
+      color: #8b949e;
+    }
   </style>
+  <!-- Add to head section -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body>
-  <h1>Maze Game</h1>
+  <h1>SMAZE</h1>
   <canvas id="mazeCanvas" width="600" height="600"></canvas>
   <div id="controls">
     <label for="algorithm">Algorithm:</label>
@@ -374,14 +437,14 @@
       }, 5); // Faster interval but still visible
     }
 
-    // Solve maze using Dijkstra's Algorithm
+    // Reconstruct path and draw it
     function solveDijkstra() {
       var distances = [];
       var prev = [];
       var visited = [];
       var pq = new MinPriorityQueue({ priority: node => node.distance });
       
-      // Initialize
+      // Initialize arrays with same pattern as DFS
       for (var y = 0; y < mazeSize; y++) {
         distances[y] = [];
         prev[y] = [];
@@ -393,11 +456,13 @@
         }
       }
       
+      // Set start position
       distances[player.y][player.x] = 0;
       pq.enqueue({ x: player.x, y: player.y, distance: 0 });
 
       solvingInterval = setInterval(function() {
         if (pq.isEmpty()) {
+          stopTimer();
           clearInterval(solvingInterval);
           solving = false;
           return;
@@ -410,16 +475,30 @@
         if (visited[y][x]) return;
         visited[y][x] = true;
 
-        // Visualization
+        // Match DFS visualization style
         ctx.fillStyle = 'red';
         ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
 
         if (x == mazeSize - 1 && y == mazeSize - 1) {
-          reconstructPath(prev);
+          // Use same path reconstruction as DFS
+          var path = [];
+          var cx = x, cy = y;
+          while (prev[cy][cx]) {
+            path.push({ x: cx, y: cy });
+            var temp = prev[cy][cx];
+            cx = temp.x;
+            cy = temp.y;
+          }
+          path.push({ x: player.x, y: player.y });
+          drawPath(path.reverse());
+          showMessage('Maze Solved!');
+          stopTimer();
+          clearInterval(solvingInterval);
+          solving = false;
           return;
         }
 
-        // Check neighbors
+        // Use same direction checking pattern as DFS
         var directions = [
           { x: x + 1, y: y },
           { x: x - 1, y: y },
@@ -430,7 +509,8 @@
         for (var i = 0; i < directions.length; i++) {
           var nx = directions[i].x;
           var ny = directions[i].y;
-          if (isValidCell(nx, ny) && !visited[ny][nx]) {
+          if (nx >= 0 && nx < mazeSize && ny >= 0 && ny < mazeSize && 
+              maze[ny][nx] == 0 && !visited[ny][nx]) {
             var alt = distances[y][x] + 1;
             if (alt < distances[ny][nx]) {
               distances[ny][nx] = alt;
@@ -439,7 +519,7 @@
             }
           }
         }
-      }, 2); // Faster to compensate for additional computations
+      }, 5); // Match DFS interval timing
     }
 
     // Heuristic function for A* (Manhattan distance)
@@ -447,93 +527,114 @@
       return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
     }
 
-    function solveAStar() {
-      var gScore = [];
-      var fScore = [];
-      var prev = [];
-      var visited = [];
-      var openSet = new MinPriorityQueue({ priority: node => node.fScore });
-      
-      // Initialize
-      for (var y = 0; y < mazeSize; y++) {
-        gScore[y] = [];
-        fScore[y] = [];
-        prev[y] = [];
-        visited[y] = [];
-        for (var x = 0; x < mazeSize; x++) {
-          gScore[y][x] = Infinity;
-          fScore[y][x] = Infinity;
-          prev[y][x] = null;
-          visited[y][x] = false;
-        }
-      }
-
-      gScore[player.y][player.x] = 0;
-      fScore[player.y][player.x] = manhattan(player.x, player.y, mazeSize-1, mazeSize-1);
-      openSet.enqueue({ 
-        x: player.x, 
-        y: player.y, 
-        fScore: fScore[player.y][player.x] 
-      });
-
-      solvingInterval = setInterval(function() {
-        if (openSet.isEmpty()) {
-          clearInterval(solvingInterval);
-          solving = false;
-          return;
-        }
-
-        var current = openSet.dequeue();
-        var x = current.x;
-        var y = current.y;
-
-        if (visited[y][x]) return;
-        visited[y][x] = true;
-
-        // Visualization
-        ctx.fillStyle = 'red';
-        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-
-        if (x == mazeSize - 1 && y == mazeSize - 1) {
-          reconstructPath(prev);
-          return;
-        }
-
-        var directions = [
-          { x: x + 1, y: y },
-          { x: x - 1, y: y },
-          { x: x, y: y + 1 },
-          { x: x, y: y - 1 }
-        ];
-
-        for (var i = 0; i < directions.length; i++) {
-          var nx = directions[i].x;
-          var ny = directions[i].y;
-          if (isValidCell(nx, ny) && !visited[ny][nx]) {
-            var tentativeGScore = gScore[y][x] + 1;
-            if (tentativeGScore < gScore[ny][nx]) {
-              prev[ny][nx] = { x: x, y: y };
-              gScore[ny][nx] = tentativeGScore;
-              fScore[ny][nx] = gScore[ny][nx] + 
-                manhattan(nx, ny, mazeSize-1, mazeSize-1);
-              openSet.enqueue({ 
-                x: nx, 
-                y: ny, 
-                fScore: fScore[ny][nx] 
-              });
-            }
-          }
-        }
-      }, 2); // Faster to compensate for additional computations
+    // Add path length display function
+    function calculatePathLength(path) {
+      return path.length - 1; // -1 because path includes start position
     }
 
+    // Add test function to verify algorithms
+    function verifyAlgorithm(algorithm, path) {
+      const pathLength = calculatePathLength(path);
+      const message = `${algorithm}: Path length = ${pathLength}`;
+      console.log(message);
+      return pathLength;
+    }
+
+    // Fix A* implementation
+    function solveAStar() {
+      var queue = [];
+      var visited = [];
+      var cameFrom = [];
+      
+      // Initialize arrays (match BFS/DFS pattern)
+      for (var y = 0; y < mazeSize; y++) {
+          visited[y] = [];
+          cameFrom[y] = [];
+          for (var x = 0; x < mazeSize; x++) {
+              visited[y][x] = false;
+              cameFrom[y][x] = null;
+          }
+      }
+
+      // Initialize start with f-score
+      queue.push({ 
+          x: player.x, 
+          y: player.y, 
+          f: heuristic({ x: player.x, y: player.y }, { x: mazeSize-1, y: mazeSize-1 })
+      });
+      visited[player.y][player.x] = true;
+
+      solvingInterval = setInterval(function() {
+          if (queue.length == 0) {
+              clearInterval(solvingInterval);
+              solving = false;
+              return;
+          }
+
+          // Sort by f-score and get best node
+          queue.sort((a, b) => a.f - b.f);
+          var current = queue.shift();
+          var x = current.x;
+          var y = current.y;
+
+          // Match visualization with BFS/DFS
+          ctx.fillStyle = 'red';
+          ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+
+          if (x == mazeSize - 1 && y == mazeSize - 1) {
+              // Match path reconstruction with BFS/DFS
+              var path = [];
+              var cx = x, cy = y;
+              while (cameFrom[cy][cx]) {
+                  path.push({ x: cx, y: cy });
+                  var temp = cameFrom[cy][cx];
+                  cx = temp.x;
+                  cy = temp.y;
+              }
+              path.push({ x: player.x, y: player.y });
+              drawPath(path.reverse());
+              showMessage('Maze Solved!');
+              stopTimer();
+              clearInterval(solvingInterval);
+              solving = false;
+              return;
+          }
+
+          // Match direction checking with BFS/DFS
+          var directions = [
+              { x: x + 1, y: y },
+              { x: x - 1, y: y },
+              { x: x, y: y + 1 },
+              { x: x, y: y - 1 }
+          ];
+
+          for (var i = 0; i < directions.length; i++) {
+              var nx = directions[i].x;
+              var ny = directions[i].y;
+              if (nx >= 0 && nx < mazeSize && ny >= 0 && ny < mazeSize && 
+                  maze[ny][nx] == 0 && !visited[ny][nx]) {
+                  visited[ny][nx] = true;
+                  cameFrom[ny][nx] = { x: x, y: y };
+                  queue.push({ 
+                      x: nx, 
+                      y: ny,
+                      f: manhattan(nx, ny, mazeSize-1, mazeSize-1)
+                  });
+              }
+          }
+      }, 5); // Match timing with BFS/DFS
+  }
+
     // Draw the solution path
-    function drawPath(path) {
+    function drawPath(path, color = '#69db7c') {
       for (var i = 0; i < path.length; i++) {
-        var x = path[i].x;
-        var y = path[i].y;
-        ctx.fillStyle = 'yellow';
-        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+        ctx.fillStyle = color;
+        ctx.fillRect(
+          path[i].x * cellSize, 
+          path[i].y * cellSize, 
+          cellSize, 
+          cellSize
+        );
       }
     }
 
@@ -608,10 +709,13 @@
       messageDiv.style.animation = '';
     }
 
-    // Add timer functions
+    // Improved Timer Management
     function startTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
       startTime = Date.now();
-      timerInterval = setInterval(updateTimer, 10); // Update every 10ms
+      timerInterval = setInterval(updateTimer, 10);
     }
 
     function stopTimer() {
