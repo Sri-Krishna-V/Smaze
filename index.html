@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Maze Game</title>
+  <style>
+    body { text-align: center; }
+    canvas { border: 1px solid black; }
+    #controls { margin-top: 10px; }
+    #message {
+      margin-top: 10px;
+      font-size: 24px;
+      opacity: 0;
+      animation: fadeInOut 3s;
+    }
+
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translateY(-20px); }
+      10% { opacity: 1; transform: translateY(0); }
+      90% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-20px); }
+    }
+
+    /* Add this to style section */
+    #timer {
+      position: fixed;
+      right: 20px;
+      top: 20px;
+      font-size: 32px;
+      font-family: monospace;
+      background-color: rgba(255, 255, 255, 0.9);
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <h1>Maze Game</h1>
+  <canvas id="mazeCanvas" width="600" height="600"></canvas>
+  <div id="controls">
+    <label for="algorithm">Algorithm:</label>
+    <select id="algorithm">
+      <option value="bfs">Breadth-First Search</option>
+      <option value="dfs">Depth-First Search</option>
+      <option value="dijkstra">Dijkstra's Algorithm</option>
+      <option value="astar">A* Algorithm</option>
+    </select>
+    <button id="solveBtn">Solve Maze</button>
+    <button id="stopBtn">Stop Solving</button>
+    <button id="resetBtn">Reset Player</button>
+    <button id="newMazeBtn">Generate New Maze</button>
+    <label for="size">Maze Size:</label>
+    <input type="number" id="size" value="25" min="10" max="100">
+    <button id="changeSizeBtn">Change Size</button>
+    <div id="timer">Time: 0.00s</div>
+  </div>
+  <div id="message"></div>
+  <script>
+    // Existing variables
+    var canvas = document.getElementById('mazeCanvas');
+    var ctx = canvas.getContext('2d');
+    var mazeSize = parseInt(document.getElementById('size').value);
+    var cellSize = canvas.width / mazeSize;
+    var maze;
+    var player;
+    var solving = false;
+    var solvingInterval = null;
+
+    // Add these variables with other global variables
+    var timerInterval = null;
+    var startTime = null;
+
+    // Priority Queue implementation
+    class MinPriorityQueue {
+      constructor(options) {
+        this.items = [];
+        this.priority = options.priority;
+      }
+
+      enqueue(element) {
+        this.items.push(element);
+        this.items.sort((a, b) => this.priority(a) - this.priority(b));
+      }
+
+      dequeue() {
+        return this.items.shift();
+      }
+
+      isEmpty() {
+        return this.items.length === 0;
+      }
+    }
+
+    // Generate maze using Kruskal's algorithm
+    function generateMaze() {
+      maze = [];
+      var sets = [];
+      var walls = [];
+
+      // Initialize the maze grid and sets
+      for (var y = 0; y < mazeSize; y++) {
+        maze[y] = [];
+        sets[y] = [];
+        for (var x = 0; x < mazeSize; x++) {
+          if (y % 2 == 1 && x % 2 == 1) {
+            maze[y][x] = 0; // Path
+            sets[y][x] = y * mazeSize + x;
+          } else {
+            maze[y][x] = 1; // Wall
+          }
+        }
+      }
+
+      // Initialize the walls list
+      for (var y = 1; y < mazeSize - 1; y += 2) {
+        for (var x = 1; x < mazeSize - 1; x += 2) {
+          if (x < mazeSize - 2) walls.push({ x: x + 1, y: y, dx: 1, dy: 0 });
+          if (y < mazeSize - 2) walls.push({ x: x, y: y + 1, dx: 0, dy: 1 });
+        }
+      }
+
+      // Shuffle walls
+      shuffleArray(walls);
+
+      // Kruskal's algorithm
+      while (walls.length > 0) {
+        var wall = walls.pop();
+        var x1 = wall.x - wall.dx;
+        var y1 = wall.y - wall.dy;
+        var x2 = wall.x + wall.dx;
+        var y2 = wall.y + wall.dy;
+
+        if (sets[y1][x1] != sets[y2][x2]) {
+          maze[wall.y][wall.x] = 0; // Remove wall
+
+          var oldSet = sets[y2][x2];
+          var newSet = sets[y1][x1];
+
+          // Merge sets
+          for (var y = 1; y < mazeSize - 1; y += 2) {
+            for (var x = 1; x < mazeSize - 1; x += 2) {
+              if (sets[y][x] == oldSet) {
+                sets[y][x] = newSet;
+              }
+            }
+          }
+        }
+      }
+
+      // Ensure start and end points are accessible
+      maze[1][0] = 0; // Entry
+      maze[mazeSize - 2][mazeSize - 1] = 0; // Exit
+    }
+
+    function getNeighbors(x, y) {
+      var neighbors = [];
+      if (x > 1 && maze[y][x - 2] == 1) neighbors.push([x - 2, y]);
+      if (x < mazeSize - 2 && maze[y][x + 2] == 1) neighbors.push([x + 2, y]);
+      if (y > 1 && maze[y - 2][x] == 1) neighbors.push([x, y - 2]);
+      if (y < mazeSize - 2 && maze[y + 2][x] == 1) neighbors.push([x, y + 2]);
+      return neighbors;
+    }
+
+    // Draw the maze
+    function drawMaze() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (var y = 0; y < mazeSize; y++) {
+        for (var x = 0; x < mazeSize; x++) {
+          if (maze[y][x] == 1) {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+          }
+        }
+      }
+      // Draw player
+      ctx.fillStyle = 'blue';
+      ctx.fillRect(player.x * cellSize, player.y * cellSize, cellSize, cellSize);
+      // Draw goal
+      ctx.fillStyle = 'green';
+      ctx.fillRect((mazeSize - 1) * cellSize, (mazeSize - 2) * cellSize, cellSize, cellSize);
+      maze[mazeSize - 1][mazeSize - 1] = 0; // Ensure the goal cell is empty
+    }
+
+    // Initialize player
+    function initializePlayer() {
+      player = { x: 0, y: 1 }; // Start just inside the entry
+    }
+
+    // Handle key presses
+    document.addEventListener('keydown', function(event) {
+      if (solving) return;
+      var key = event.key;
+      var newX = player.x;
+      var newY = player.y;
+      if (key == 'w') newY -= 1;
+      if (key == 's') newY += 1;
+      if (key == 'a') newX -= 1;
+      if (key == 'd') newX += 1;
+      if (newX >= 0 && newX < mazeSize && newY >= 0 && newY < mazeSize && maze[newY][newX] == 0) {
+        player.x = newX;
+        player.y = newY;
+        drawMaze();
+        checkWin();
+      }
+    });
+
+    // Check if player has reached the goal
+    function checkWin() {
+      if (player.x == mazeSize - 1 && player.y == mazeSize - 2) {
+        alert('You won!');
+      }
+    }
+
+    // Solve maze
+    document.getElementById('solveBtn').addEventListener('click', function() {
+      var algorithm = document.getElementById('algorithm').value;
+      solving = true;
+      startTimer(); // Start timer when solving begins
+      if (algorithm == 'bfs') {
+        solveBFS();
+      } else if (algorithm == 'dfs') {
+        solveDFS();
+      } else if (algorithm == 'dijkstra') {
+        solveDijkstra();
+      } else if (algorithm == 'astar') {
+        solveAStar();
+      }
+    });
+
+    // Solve maze using BFS
+    function solveBFS() {
+      var queue = [];
+      var visited = [];
+      var cameFrom = [];
+      
+      // Initialize arrays
+      for (var y = 0; y < mazeSize; y++) {
+        visited[y] = [];
+        cameFrom[y] = [];
+        for (var x = 0; x < mazeSize; x++) {
+          visited[y][x] = false;
+          cameFrom[y][x] = null;
+        }
+      }
+
+      queue.push({ x: player.x, y: player.y });
+      visited[player.y][player.x] = true;
+
+      solvingInterval = setInterval(function() {
+        if (queue.length == 0) {
+          clearInterval(solvingInterval);
+          solving = false;
+          return;
+        }
+
+        var current = queue.shift();
+        var x = current.x;
+        var y = current.y;
+
+        // Visualize current cell
+        ctx.fillStyle = 'red';
+        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+
+        if (x == mazeSize - 1 && y == mazeSize - 1) {
+          // Reconstruct and draw path
+          var path = [];
+          var cx = x, cy = y;
+          while (cameFrom[cy][cx]) {
+            path.push({ x: cx, y: cy });
+            var temp = cameFrom[cy][cx];
+            cx = temp.x;
+            cy = temp.y;
+          }
+          path.push({ x: player.x, y: player.y });
+          drawPath(path.reverse());
+          showMessage('Maze Solved!');
+          stopTimer();
+          clearInterval(solvingInterval);
+          solving = false;
+          return;
+        }
+
+        var directions = [
+          { x: x + 1, y: y },
+          { x: x - 1, y: y },
+          { x: x, y: y + 1 },
+          { x: x, y: y - 1 }
+        ];
+
+        for (var i = 0; i < directions.length; i++) {
+          var nx = directions[i].x;
+          var ny = directions[i].y;
+          if (nx >= 0 && nx < mazeSize && ny >= 0 && ny < mazeSize && 
+              maze[ny][nx] == 0 && !visited[ny][nx]) {
+            visited[ny][nx] = true;
+            cameFrom[ny][nx] = { x: x, y: y };
+            queue.push({ x: nx, y: ny });
+          }
+        }
+      }, 5); // Match DFS speed
+    }
+
+    // Solve maze using DFS
+    function solveDFS() {
+      var stack = [];
+      var visited = [];
+      var cameFrom = [];
+      
+      // Initialize arrays
+      for (var y = 0; y < mazeSize; y++) {
+        visited[y] = [];
+        cameFrom[y] = [];
+        for (var x = 0; x < mazeSize; x++) {
+          visited[y][x] = false;
+          cameFrom[y][x] = null;
+        }
+      }
+
+      stack.push({ x: player.x, y: player.y });
+      visited[player.y][player.x] = true;
+
+      solvingInterval = setInterval(function() {
+        if (stack.length == 0) {
+          clearInterval(solvingInterval);
+          solving = false;
+          return;
+        }
+
+        var current = stack.pop();
+        var x = current.x;
+        var y = current.y;
+
+        // Visualize current cell
+        ctx.fillStyle = 'red';
+        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+
+        if (x == mazeSize - 1 && y == mazeSize - 1) {
+          // Reconstruct and draw path
+          var path = [];
+          var cx = x, cy = y;
+          while (cameFrom[cy][cx]) {
+            path.push({ x: cx, y: cy });
+            var temp = cameFrom[cy][cx];
+            cx = temp.x;
+            cy = temp.y;
+          }
+          path.push({ x: player.x, y: player.y });
+          drawPath(path.reverse());
+          showMessage('Maze Solved!');
+          stopTimer();
+          clearInterval(solvingInterval);
+          solving = false;
+          return;
+        }
+
+        var directions = [
+          { x: x + 1, y: y },
+          { x: x - 1, y: y },
+          { x: x, y: y + 1 },
+          { x: x, y: y - 1 }
+        ];
+
+        for (var i = 0; i < directions.length; i++) {
+          var nx = directions[i].x;
+          var ny = directions[i].y;
+          if (nx >= 0 && nx < mazeSize && ny >= 0 && ny < mazeSize && 
+              maze[ny][nx] == 0 && !visited[ny][nx]) {
+            visited[ny][nx] = true;
+            cameFrom[ny][nx] = { x: x, y: y };
+            stack.push({ x: nx, y: ny });
+          }
+        }
+      }, 5); // Faster interval but still visible
+    }
+
+    // Solve maze using Dijkstra's Algorithm
+    function solveDijkstra() {
+      var distances = [];
+      var prev = [];
+      var visited = [];
+      var pq = new MinPriorityQueue({ priority: node => node.distance });
+      
+      // Initialize
+      for (var y = 0; y < mazeSize; y++) {
+        distances[y] = [];
+        prev[y] = [];
+        visited[y] = [];
+        for (var x = 0; x < mazeSize; x++) {
+          distances[y][x] = Infinity;
+          prev[y][x] = null;
+          visited[y][x] = false;
+        }
+      }
+      
+      distances[player.y][player.x] = 0;
+      pq.enqueue({ x: player.x, y: player.y, distance: 0 });
+
+      solvingInterval = setInterval(function() {
+        if (pq.isEmpty()) {
+          clearInterval(solvingInterval);
+          solving = false;
+          return;
+        }
+
+        var current = pq.dequeue();
+        var x = current.x;
+        var y = current.y;
+
+        if (visited[y][x]) return;
+        visited[y][x] = true;
+
+        // Visualization
+        ctx.fillStyle = 'red';
+        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+
+        if (x == mazeSize - 1 && y == mazeSize - 1) {
+          reconstructPath(prev);
+          return;
+        }
+
+        // Check neighbors
+        var directions = [
+          { x: x + 1, y: y },
+          { x: x - 1, y: y },
+          { x: x, y: y + 1 },
+          { x: x, y: y - 1 }
+        ];
+
+        for (var i = 0; i < directions.length; i++) {
+          var nx = directions[i].x;
+          var ny = directions[i].y;
+          if (isValidCell(nx, ny) && !visited[ny][nx]) {
+            var alt = distances[y][x] + 1;
+            if (alt < distances[ny][nx]) {
+              distances[ny][nx] = alt;
+              prev[ny][nx] = { x: x, y: y };
+              pq.enqueue({ x: nx, y: ny, distance: alt });
+            }
+          }
+        }
+      }, 2); // Faster to compensate for additional computations
+    }
+
+    // Heuristic function for A* (Manhattan distance)
+    function heuristic(a, b) {
+      return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    }
+
+    function solveAStar() {
+      var gScore = [];
+      var fScore = [];
+      var prev = [];
+      var visited = [];
+      var openSet = new MinPriorityQueue({ priority: node => node.fScore });
+      
+      // Initialize
+      for (var y = 0; y < mazeSize; y++) {
+        gScore[y] = [];
+        fScore[y] = [];
+        prev[y] = [];
+        visited[y] = [];
+        for (var x = 0; x < mazeSize; x++) {
+          gScore[y][x] = Infinity;
+          fScore[y][x] = Infinity;
+          prev[y][x] = null;
+          visited[y][x] = false;
+        }
+      }
+
+      gScore[player.y][player.x] = 0;
+      fScore[player.y][player.x] = manhattan(player.x, player.y, mazeSize-1, mazeSize-1);
+      openSet.enqueue({ 
+        x: player.x, 
+        y: player.y, 
+        fScore: fScore[player.y][player.x] 
+      });
+
+      solvingInterval = setInterval(function() {
+        if (openSet.isEmpty()) {
+          clearInterval(solvingInterval);
+          solving = false;
+          return;
+        }
+
+        var current = openSet.dequeue();
+        var x = current.x;
+        var y = current.y;
+
+        if (visited[y][x]) return;
+        visited[y][x] = true;
+
+        // Visualization
+        ctx.fillStyle = 'red';
+        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+
+        if (x == mazeSize - 1 && y == mazeSize - 1) {
+          reconstructPath(prev);
+          return;
+        }
+
+        var directions = [
+          { x: x + 1, y: y },
+          { x: x - 1, y: y },
+          { x: x, y: y + 1 },
+          { x: x, y: y - 1 }
+        ];
+
+        for (var i = 0; i < directions.length; i++) {
+          var nx = directions[i].x;
+          var ny = directions[i].y;
+          if (isValidCell(nx, ny) && !visited[ny][nx]) {
+            var tentativeGScore = gScore[y][x] + 1;
+            if (tentativeGScore < gScore[ny][nx]) {
+              prev[ny][nx] = { x: x, y: y };
+              gScore[ny][nx] = tentativeGScore;
+              fScore[ny][nx] = gScore[ny][nx] + 
+                manhattan(nx, ny, mazeSize-1, mazeSize-1);
+              openSet.enqueue({ 
+                x: nx, 
+                y: ny, 
+                fScore: fScore[ny][nx] 
+              });
+            }
+          }
+        }
+      }, 2); // Faster to compensate for additional computations
+    }
+
+    // Draw the solution path
+    function drawPath(path) {
+      for (var i = 0; i < path.length; i++) {
+        var x = path[i].x;
+        var y = path[i].y;
+        ctx.fillStyle = 'yellow';
+        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+      }
+    }
+
+    // Reset maze
+    document.getElementById('resetBtn').addEventListener('click', function() {
+      initializePlayer();
+      drawMaze();
+    });
+
+    // Change maze size
+    document.getElementById('changeSizeBtn').addEventListener('click', function() {
+      mazeSize = parseInt(document.getElementById('size').value);
+      if (mazeSize % 2 == 0) mazeSize += 1; // Make it odd
+      cellSize = canvas.width / mazeSize;
+      generateMaze();
+      initializePlayer();
+      drawMaze();
+    });
+
+    // Stop solving
+    document.getElementById('stopBtn').addEventListener('click', function() {
+      if (solvingInterval) {
+        clearInterval(solvingInterval);
+        stopTimer(); // Stop timer when solving is interrupted
+        solving = false;
+      }
+    });
+
+    // Initialize game
+    generateMaze();
+    initializePlayer();
+    drawMaze();
+
+    // Shuffle array
+    function shuffleArray(array) {
+      for (var i = array.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var temp = array[i];
+        array[i] = array[j];
+        array[j] = temp;
+      }
+    }
+
+    // Reset Player Position
+    document.getElementById('resetBtn').addEventListener('click', function() {
+      initializePlayer();
+      drawMaze();
+    });
+
+    // Generate New Maze
+    document.getElementById('newMazeBtn').addEventListener('click', function() {
+      generateMaze();
+      initializePlayer();
+      drawMaze();
+    });
+
+    // Change Maze Size
+    document.getElementById('changeSizeBtn').addEventListener('click', function() {
+      mazeSize = parseInt(document.getElementById('size').value);
+      if (mazeSize % 2 == 0) mazeSize += 1; // Ensure maze size is odd
+      cellSize = canvas.width / mazeSize;
+      generateMaze();
+      initializePlayer();
+      drawMaze();
+    });
+
+    function showMessage(text) {
+      var messageDiv = document.getElementById('message');
+      messageDiv.textContent = text;
+      messageDiv.style.animation = 'none'; // Reset animation
+      void messageDiv.offsetWidth; // Trigger reflow
+      messageDiv.style.animation = '';
+    }
+
+    // Add timer functions
+    function startTimer() {
+      startTime = Date.now();
+      timerInterval = setInterval(updateTimer, 10); // Update every 10ms
+    }
+
+    function stopTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+    }
+
+    function updateTimer() {
+      if (!startTime) return;
+      var elapsedTime = (Date.now() - startTime) / 1000;
+      document.getElementById('timer').textContent = `Time: ${elapsedTime.toFixed(2)}s`;
+    }
+
+    // Add manhattan function
+    function manhattan(x1, y1, x2, y2) {
+      return Math.abs(x1 - x2) + Math.abs(y1 - y2);
+    }
+  </script>
+</body>
+</html>
