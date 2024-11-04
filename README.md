@@ -1,8 +1,6 @@
-# Smaze - Interactive Maze Generator & Solver
+# SMaze - Interactive Maze Generator & Solver
 
 A visually enhanced maze generation and pathfinding visualization tool with multiple algorithms and dark theme aesthetics.
-
-![Maze Screenshot](screenshots/maze.png)
 
 ## Features
 
@@ -120,7 +118,7 @@ A visually enhanced maze generation and pathfinding visualization tool with mult
 ## Usage
 
 ### Running the Project
-1. Open the `index.html` file in your web browser.
+1. Open the `SMaze.html` file in your web browser.
 2. The maze will be generated automatically upon loading.
 
 ### Interactive Controls
