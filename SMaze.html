@@ -20,7 +20,6 @@
       100% { opacity: 0; transform: translateY(-20px); }
     }
 
-    /* Add this to style section */
     #timer {
       position: fixed;
       right: 20px;
@@ -93,7 +92,7 @@
       color: #8b949e;
     }
   </style>
-  <!-- Add to head section -->
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;600&display=swap" rel="stylesheet">
@@ -120,7 +119,7 @@
   </div>
   <div id="message"></div>
   <script>
-    // Existing variables
+
     var canvas = document.getElementById('mazeCanvas');
     var ctx = canvas.getContext('2d');
     var mazeSize = parseInt(document.getElementById('size').value);
@@ -130,11 +129,11 @@
     var solving = false;
     var solvingInterval = null;
 
-    // Add these variables with other global variables
+
     var timerInterval = null;
     var startTime = null;
 
-    // Priority Queue implementation
+
     class MinPriorityQueue {
       constructor(options) {
         this.items = [];
