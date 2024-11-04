@@ -17,6 +17,78 @@ A visually enhanced maze generation and pathfinding visualization tool with mult
 - Dijkstra's Algorithm - Optimal pathfinding
 - A* Search - Efficient directed search
 
+## Algorithm Guide
+
+### Maze Generation: Kruskal's Algorithm
+- **How it works**: 
+  - Treats maze as a graph where cells are vertices
+  - Randomly joins cells while avoiding cycles
+  - Creates perfect maze with exactly one path between any two points
+- **Time Complexity**: O(E log V)
+- **Characteristics**:
+  - Unbiased maze generation
+  - Guarantees solvable paths
+  - Creates mazes with many long corridors
+
+### Pathfinding Algorithms
+
+#### 1. Breadth-First Search (BFS)
+- **Strategy**: Explores all cells at current distance before moving further
+- **Characteristics**:
+  - Guarantees shortest path
+  - Explores radially outward
+  - Complete: Will find solution if exists
+- **Time Complexity**: O(V + E)
+- **Space Complexity**: O(V)
+- **Best Used When**: Finding shortest path in unweighted maze
+- **Visual Pattern**: Expands like a circle from start
+
+#### 2. Depth-First Search (DFS)
+- **Strategy**: Explores as far as possible along each branch
+- **Characteristics**:
+  - Memory efficient
+  - May not find shortest path
+  - Complete for finite mazes
+- **Time Complexity**: O(V + E)
+- **Space Complexity**: O(h) where h is maze height
+- **Best Used When**: Memory is constrained
+- **Visual Pattern**: Explores one long path at a time
+
+#### 3. Dijkstra's Algorithm
+- **Strategy**: Explores cells based on distance from start
+- **Characteristics**:
+  - Guarantees shortest path
+  - Works with weighted paths
+  - Complete and optimal
+- **Time Complexity**: O((V + E) log V)
+- **Space Complexity**: O(V)
+- **Best Used When**: Finding shortest path in weighted maze
+- **Visual Pattern**: Expands based on distance
+
+#### 4. A* Search
+- **Strategy**: Uses heuristic to guide search toward goal
+- **Characteristics**:
+  - Usually faster than Dijkstra
+  - Optimal with admissible heuristic
+  - Combines actual and estimated cost
+- **Time Complexity**: O((V + E) log V)
+- **Space Complexity**: O(V)
+- **Best Used When**: Speed is priority and have good heuristic
+- **Visual Pattern**: Focuses exploration toward goal
+
+### Algorithm Comparison
+
+| Algorithm | Guarantees Shortest Path | Memory Usage | Speed | Use Case |
+|-----------|-------------------------|--------------|-------|-----------|
+| BFS | Yes | High | Medium | Unweighted, shortest path needed |
+| DFS | No | Low | Fast | Memory constrained, any path needed |
+| Dijkstra | Yes | Medium | Medium | Weighted, shortest path needed |
+| A* | Yes* | Medium | Fast | When good heuristic exists |
+
+\* With admissible heuristic
+
+### Visual Patterns
+
 ### Visual Enhancements
 - GitHub Dark theme inspired design
 - Radial gradient background (#0D1117 to #161B22)
