@@ -1,6 +1,6 @@
 # SMaze - Interactive Maze Generator & Solver
 
-A visually enhanced maze generation and pathfinding visualization tool with multiple algorithms and dark theme aesthetics.
+A visually enhanced maze generation and pathfinding visualization tool with multiple algorithms.
 
 ## Features
 
