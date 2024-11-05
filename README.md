@@ -10,10 +10,10 @@ A visually enhanced maze generation and pathfinding visualization tool with mult
 - Guaranteed solvable paths
 
 ### Pathfinding Algorithms
-- Breadth-First Search (BFS) - Guarantees shortest path
+- Breadth-First Search (BFS) - Guarantees shortest path, but not useful for Maze Solving
 - Depth-First Search (DFS) - Fast exploration
-- Dijkstra's Algorithm - Optimal pathfinding
-- A* Search - Efficient directed search
+- Dijkstra's Algorithm - Optimal pathfinding, it searches the entire Maze and checks for the most shortest path
+- A* Search - Efficient directed search. Uses Mahattan Distance formula as heuristic function.
 
 ## Algorithm Guide
 
