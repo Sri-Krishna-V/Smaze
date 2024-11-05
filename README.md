@@ -88,10 +88,6 @@ A visually enhanced maze generation and pathfinding visualization tool with mult
 ### Visual Patterns
 
 ### Visual Enhancements
-- GitHub Dark theme inspired design
-- Radial gradient background (#0D1117 to #161B22)
-- Glowing maze walls with gradient effects
-- Glass-morphism UI elements
 - Real-time solving visualization
 - Path tracking with highlighted solutions
 - Dynamic timer display
