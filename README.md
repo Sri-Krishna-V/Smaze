@@ -1,26 +1,14 @@
 # SMaze - Interactive Maze Generator & Solver
 
-<<<<<<< HEAD
 A modern, accessible maze generation and pathfinding visualization tool built with vanilla JavaScript. Features multiple algorithms, responsive design, and educational visualizations.
-=======
-A visually enhanced maze generation and pathfinding visualization tool with multiple algorithms.
->>>>>>> 8de62b15987d3dd033f2869fad535f0b2b67bcc8
 
 ## ✨ Features
 
 ### 🏗️ Maze Generation
 
-<<<<<<< HEAD
 - **Kruskal's Algorithm**: Creates perfect mazes with guaranteed unique solutions
 - **Adjustable Size**: Dynamic maze sizes from 10x10 to 100x100
 - **Instant Generation**: Fast maze creation with optimized algorithms
-=======
-### Pathfinding Algorithms
-- Breadth-First Search (BFS) - Guarantees shortest path, but not useful for Maze Solving
-- Depth-First Search (DFS) - Fast exploration
-- Dijkstra's Algorithm - Optimal pathfinding, it searches the entire Maze and checks for the most shortest path
-- A* Search - Efficient directed search. Uses Mahattan Distance formula as heuristic function.
->>>>>>> 8de62b15987d3dd033f2869fad535f0b2b67bcc8
 
 ### 🔍 Pathfinding Algorithms
 
@@ -184,14 +172,7 @@ The project follows modern JavaScript best practices:
 - **Prettier**: Consistent code formatting
 - **JSDoc**: Comprehensive code documentation
 
-<<<<<<< HEAD
 ### Architecture
-=======
-### Visual Enhancements
-- Real-time solving visualization
-- Path tracking with highlighted solutions
-- Dynamic timer display
->>>>>>> 8de62b15987d3dd033f2869fad535f0b2b67bcc8
 
 - **Modular Design**: Separation of concerns with dedicated modules
 - **Class-Based**: Object-oriented approach for better maintainability
