@@ -1,0 +1,35 @@
+{
+  "name": "smaze",
+  "version": "1.0.0",
+  "description": "Interactive Maze Generator & Solver with multiple pathfinding algorithms",
+  "main": "index.html",
+  "scripts": {
+    "start": "npm run serve",
+    "serve": "npx serve .",
+    "dev": "npx live-server .",
+    "lint": "npx eslint src/js/*.js",
+    "lint:fix": "npx eslint src/js/*.js --fix",
+    "format": "npx prettier --write src/**/*"
+  },
+  "keywords": [
+    "maze",
+    "pathfinding",
+    "algorithms",
+    "visualization",
+    "bfs",
+    "dfs",
+    "dijkstra",
+    "astar"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "live-server": "^1.2.2",
+    "serve": "^14.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

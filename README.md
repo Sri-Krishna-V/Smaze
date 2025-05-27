@@ -1,27 +1,109 @@
 # SMaze - Interactive Maze Generator & Solver
 
-A visually enhanced maze generation and pathfinding visualization tool with multiple algorithms and dark theme aesthetics.
+A modern, accessible maze generation and pathfinding visualization tool built with vanilla JavaScript. Features multiple algorithms, responsive design, and educational visualizations.
 
-## Features
+## ✨ Features
 
-### Maze Generation
-- Random maze generation using Kruskal's algorithm
-- Adjustable maze size (10x10 to 100x100)
-- Guaranteed solvable paths
+### 🏗️ Maze Generation
 
-### Pathfinding Algorithms
-- Breadth-First Search (BFS) - Guarantees shortest path
-- Depth-First Search (DFS) - Fast exploration
-- Dijkstra's Algorithm - Optimal pathfinding
-- A* Search - Efficient directed search
+- **Kruskal's Algorithm**: Creates perfect mazes with guaranteed unique solutions
+- **Adjustable Size**: Dynamic maze sizes from 10x10 to 100x100
+- **Instant Generation**: Fast maze creation with optimized algorithms
 
-## Algorithm Guide
+### 🔍 Pathfinding Algorithms
+
+- **Breadth-First Search (BFS)**: Guarantees shortest path discovery
+- **Depth-First Search (DFS)**: Fast exploration with memory efficiency
+- **Dijkstra's Algorithm**: Optimal pathfinding for weighted graphs
+- **A* Search**: Intelligent heuristic-based pathfinding
+
+### 🎮 Interactive Features
+
+- **Manual Play**: Use WASD or arrow keys to navigate
+- **Auto-Solve**: Watch algorithms solve mazes in real-time
+- **Timer**: Track solving performance
+- **Responsive Design**: Works on desktop and mobile devices
+- **Accessibility**: Full keyboard navigation and screen reader support
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Modern web browser with JavaScript enabled
+- Node.js 14+ (for development)
+
+### Installation
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd smaze
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+### Production Deployment
+
+```bash
+# Build for production
+npm run build
+
+# Serve static files
+npm start
+```
+
+## 🎯 Usage
+
+### Manual Navigation
+
+- Use **WASD** or **Arrow Keys** to move the blue player
+- Reach the **green goal** in the bottom-right corner
+- Track your time with the built-in timer
+
+### Auto-Solving
+
+1. Select a pathfinding algorithm from the dropdown
+2. Click **"Solve Maze"** to start visualization
+3. Watch the algorithm explore the maze (red cells)
+4. View the final solution path (green cells)
+
+### Keyboard Shortcuts
+
+- **Space**: Start/Stop solving
+- **R**: Reset player position
+- **N**: Generate new maze
+- **Escape**: Stop current algorithm
+
+## 🏗️ Project Structure
+
+```text
+smaze/
+├── index.html              # Main HTML file
+├── package.json            # Project dependencies
+├── .eslintrc.json         # ESLint configuration
+├── .prettierrc.json       # Prettier configuration
+├── src/
+│   ├── css/
+│   │   └── styles.css     # Main stylesheet
+│   └── js/
+│       ├── app.js         # Application entry point
+│       ├── game.js        # Game logic and rendering
+│       ├── maze-generator.js    # Maze generation algorithms
+│       ├── pathfinding-algorithms.js  # Pathfinding implementations
+│       └── utils.js       # Utility functions
+├── assets/                # Static assets
+└── README.md             # Project documentation
+```
+
+## 📊 Algorithm Details
 
 ### Maze Generation: Kruskal's Algorithm
-- **How it works**: 
-  - Treats maze as a graph where cells are vertices
-  - Randomly joins cells while avoiding cycles
-  - Creates perfect maze with exactly one path between any two points
+
+- **How it works**: Treats maze as a graph where cells are vertices, randomly joins cells while avoiding cycles
 - **Time Complexity**: O(E log V)
 - **Characteristics**:
   - Unbiased maze generation
@@ -31,6 +113,7 @@ A visually enhanced maze generation and pathfinding visualization tool with mult
 ### Pathfinding Algorithms
 
 #### 1. Breadth-First Search (BFS)
+
 - **Strategy**: Explores all cells at current distance before moving further
 - **Characteristics**:
   - Guarantees shortest path
@@ -42,6 +125,7 @@ A visually enhanced maze generation and pathfinding visualization tool with mult
 - **Visual Pattern**: Expands like a circle from start
 
 #### 2. Depth-First Search (DFS)
+
 - **Strategy**: Explores as far as possible along each branch
 - **Characteristics**:
   - Memory efficient
@@ -49,87 +133,119 @@ A visually enhanced maze generation and pathfinding visualization tool with mult
   - Complete for finite mazes
 - **Time Complexity**: O(V + E)
 - **Space Complexity**: O(h) where h is maze height
-- **Best Used When**: Memory is constrained
-- **Visual Pattern**: Explores one long path at a time
+- **Best Used When**: Memory is limited
+- **Visual Pattern**: Creates long corridors before backtracking
 
 #### 3. Dijkstra's Algorithm
+
 - **Strategy**: Explores cells based on distance from start
 - **Characteristics**:
   - Guarantees shortest path
-  - Works with weighted paths
+  - Works with weighted graphs
   - Complete and optimal
 - **Time Complexity**: O((V + E) log V)
 - **Space Complexity**: O(V)
-- **Best Used When**: Finding shortest path in weighted maze
-- **Visual Pattern**: Expands based on distance
+- **Best Used When**: Graph has weighted edges
+- **Visual Pattern**: Uniform cost expansion
 
 #### 4. A* Search
+
 - **Strategy**: Uses heuristic to guide search toward goal
 - **Characteristics**:
-  - Usually faster than Dijkstra
   - Optimal with admissible heuristic
-  - Combines actual and estimated cost
-- **Time Complexity**: O((V + E) log V)
-- **Space Complexity**: O(V)
+  - More efficient than Dijkstra
+  - Directed search
+- **Time Complexity**: O(b^d) where b is branching factor
+- **Space Complexity**: O(b^d)
 - **Best Used When**: Speed is priority and have good heuristic
-- **Visual Pattern**: Focuses exploration toward goal
+- **Visual Pattern**: Directed toward goal
 
-### Algorithm Comparison
+## 🛠️ Development
 
-| Algorithm | Guarantees Shortest Path | Memory Usage | Speed | Use Case |
-|-----------|-------------------------|--------------|-------|-----------|
-| BFS | Yes | High | Medium | Unweighted, shortest path needed |
-| DFS | No | Low | Fast | Memory constrained, any path needed |
-| Dijkstra | Yes | Medium | Medium | Weighted, shortest path needed |
-| A* | Yes* | Medium | Fast | When good heuristic exists |
+### Code Quality
 
-\* With admissible heuristic
+The project follows modern JavaScript best practices:
 
-### Visual Patterns
+- **ES6+ Features**: Modern JavaScript syntax and features
+- **Strict Mode**: All modules use strict mode
+- **ESLint**: Code linting with recommended rules
+- **Prettier**: Consistent code formatting
+- **JSDoc**: Comprehensive code documentation
 
-### Visual Enhancements
-- GitHub Dark theme inspired design
-- Radial gradient background (#0D1117 to #161B22)
-- Glowing maze walls with gradient effects
-- Glass-morphism UI elements
-- Real-time solving visualization
-- Path tracking with highlighted solutions
-- Dynamic timer display
+### Architecture
 
-### Interactive Controls
-- Algorithm selection dropdown
-- Maze size adjustment
-- Solution visualization
-- Player reset
-- Maze regeneration
-- Solving process control (Start/Stop)
+- **Modular Design**: Separation of concerns with dedicated modules
+- **Class-Based**: Object-oriented approach for better maintainability
+- **Error Handling**: Robust error handling throughout the application
+- **Performance**: Optimized algorithms and rendering
 
-## Tech Stack
-- HTML5 Canvas for maze rendering
-- CSS3 with modern features:
-  - Backdrop filters
-  - Glass-morphism effects
-  - CSS Grid/Flexbox
-  - Custom animations
-- Vanilla JavaScript for algorithms
+### Scripts
 
-## File Structure
+```bash
+# Development
+npm run dev          # Start development server with live reload
+npm run serve        # Serve static files
 
-## Usage
+# Code Quality
+npm run lint         # Run ESLint
+npm run lint:fix     # Fix ESLint issues automatically
+npm run format       # Format code with Prettier
+```
 
-### Running the Project
-1. Open the `SMaze.html` file in your web browser.
-2. The maze will be generated automatically upon loading.
+## 🎨 Features
 
-### Interactive Controls
-- **Algorithm Selection**: Use the dropdown menu to select the desired pathfinding algorithm (BFS, DFS, Dijkstra, A*).
-- **Maze Size Adjustment**: Enter a value between 10 and 100 in the "Maze Size" input field and click "Change Size" to adjust the maze size.
-- **Solve Maze**: Click the "Solve Maze" button to start solving the maze using the selected algorithm.
-- **Stop Solving**: Click the "Stop Solving" button to stop the solving process.
-- **Reset Player**: Click the "Reset Player" button to reset the player's position to the start of the maze.
-- **Generate New Maze**: Click the "Generate New Maze" button to generate a new random maze.
+### Responsive Design
 
-### Additional Information
-- The timer will start when you begin solving the maze and stop when the maze is solved or the solving process is stopped.
-- The player's position can be controlled using the 'W', 'A', 'S', 'D' keys to move up, left, down, and right respectively.
-- The goal is to reach the green cell at the bottom-right corner of the maze.
+- **Mobile-First**: Optimized for mobile devices
+- **Flexible Layout**: Adapts to different screen sizes
+- **Touch Support**: Touch-friendly controls
+
+### Accessibility
+
+- **Keyboard Navigation**: Full keyboard support
+- **Screen Readers**: ARIA labels and semantic HTML
+- **Focus Management**: Proper focus indicators
+- **Color Contrast**: High contrast for visibility
+
+### Performance
+
+- **Optimized Rendering**: Efficient canvas drawing
+- **Memory Management**: Proper cleanup and resource management
+- **Smooth Animations**: 60fps animations and transitions
+
+## 🚀 Technologies Used
+
+- **HTML5 Canvas**: High-performance maze rendering
+- **Vanilla JavaScript**: No framework dependencies
+- **CSS3**: Modern styling with custom properties
+- **Web APIs**: Performance timing, visibility API
+- **Node.js**: Development tooling and package management
+
+## 📱 Browser Support
+
+- Chrome 60+
+- Firefox 60+
+- Safari 12+
+- Edge 79+
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Inspired by classic maze algorithms and pathfinding visualizations
+- Built for educational purposes in AI and algorithms courses
+- Thanks to the computer science community for algorithm research
+
+---
+
+**SMaze** - Making pathfinding algorithms visual and interactive! 🎯

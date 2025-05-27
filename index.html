@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Interactive Maze Generator & Solver with multiple pathfinding algorithms">
+  <meta name="keywords" content="maze, pathfinding, algorithms, visualization, BFS, DFS, Dijkstra, A*">
+  <meta name="author" content="Your Name">
+  
+  <title>SMaze - Interactive Maze Generator & Solver</title>
+  
+  <!-- Preconnect to external resources -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  
+  <!-- External stylesheets -->
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="src/css/styles.css">
+</head>
+<body>
+  <header>
+    <h1>SMaze</h1>
+    <p class="subtitle">Interactive Maze Generator & Solver</p>
+  </header>
+  
+  <main>
+    <section class="game-area" role="main" aria-label="Maze game area">
+      <canvas 
+        id="mazeCanvas" 
+        width="600" 
+        height="600"
+        aria-label="Maze visualization canvas"
+        role="img">
+        Your browser does not support the HTML5 Canvas element.
+      </canvas>
+      
+      <div id="timer" aria-live="polite" role="timer">
+        Time: 0.00s
+      </div>
+    </section>
+    
+    <section class="controls" role="group" aria-label="Game controls">
+      <div class="control-group">
+        <label for="algorithm">Algorithm:</label>
+        <select id="algorithm" aria-describedby="algorithm-help">
+          <option value="bfs">Breadth-First Search</option>
+          <option value="dfs">Depth-First Search</option>
+          <option value="dijkstra">Dijkstra's Algorithm</option>
+          <option value="astar">A* Algorithm</option>
+        </select>
+        <small id="algorithm-help">Choose a pathfinding algorithm to solve the maze</small>
+      </div>
+      
+      <div class="control-group">
+        <button id="solveBtn" type="button">Solve Maze</button>
+        <button id="stopBtn" type="button">Stop Solving</button>
+        <button id="resetBtn" type="button">Reset Player</button>
+        <button id="newMazeBtn" type="button">Generate New Maze</button>
+      </div>
+      
+      <div class="control-group">
+        <label for="size">Maze Size:</label>
+        <input 
+          type="number" 
+          id="size" 
+          value="25" 
+          min="10" 
+          max="100"
+          aria-describedby="size-help">
+        <button id="changeSizeBtn" type="button">Change Size</button>
+        <small id="size-help">Set maze dimensions (10-100)</small>
+      </div>
+    </section>
+    
+    <section class="instructions" role="region" aria-label="Game instructions">
+      <h2>Instructions</h2>
+      <ul>
+        <li><strong>Movement:</strong> Use WASD keys to move the blue player</li>
+        <li><strong>Goal:</strong> Reach the green target in the bottom-right corner</li>
+        <li><strong>Auto-solve:</strong> Select an algorithm and click "Solve Maze"</li>
+        <li><strong>Size:</strong> Adjust maze complexity with the size control</li>
+      </ul>
+    </section>
+  </main>
+  
+  <div id="message" aria-live="assertive" role="alert"></div>
+  
+  <footer>
+    <p>&copy; 2025 SMaze - Educational Pathfinding Visualization</p>
+  </footer>
+  
+  <!-- JavaScript modules -->
+  <script src="src/js/utils.js"></script>
+  <script src="src/js/maze-generator.js"></script>
+  <script src="src/js/pathfinding-algorithms.js"></script>
+  <script src="src/js/game.js"></script>
+  <script src="src/js/app.js"></script>
+</body>
+</html>
