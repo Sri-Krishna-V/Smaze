@@ -1,491 +1,343 @@
 'use strict';
 
 /**
- * Pathfinding algorithms for maze solving
- * Implements BFS, DFS, Dijkstra's, and A* algorithms
+ * Pathfinding algorithms for maze solving: BFS, DFS, Dijkstra's, and A*.
  *
- * NOTE: This file depends on utility functions from utils.js
- * Make sure utils.js is loaded before this file
+ * Every algorithm is keyed by integer cell index over a {@link Grid} and backed
+ * by flat typed arrays (visited: Uint8Array, cameFrom/distances: Int32Array)
+ * instead of per-cell `{x, y}` objects. That makes them dimension-agnostic — the
+ * same code solves 2D and 3D mazes because neighbor topology comes from
+ * `grid.neighbors(i)` — and keeps the working set near one byte (visited) plus a
+ * few ints per cell, so they scale to the memory budget.
+ *
+ * Each algorithm advances one node per `step()` call and returns a uniform
+ * result, so the Game can drive animation from a single requestAnimationFrame
+ * loop (pumping N steps per frame for the speed control) and also run searches
+ * headlessly to completion for compare mode.
+ *
+ * `step()` returns { done, found, current, path }:
+ *   - current : index of the cell expanded this step (for visualization), or -1
+ *               for a no-op step (e.g. a stale heap entry already visited).
+ *   - done    : true once the search has terminated.
+ *   - found   : true if the goal was reached.
+ *   - path    : the solution path (array of indices) when found, else null.
+ *
+ * Depends on data-structures.js (BinaryHeap) and utils.js (manhattanIndex).
  */
 
-// Check if the required utility functions are available
-if (typeof create2DArray === 'undefined' ||
-    typeof isValidCoordinate === 'undefined' ||
-    typeof manhattanDistance === 'undefined' ||
-    typeof getDirections === 'undefined') {
-  console.error('Required utility functions not found. Make sure utils.js is loaded before this file.');
-  // Instead of just logging an error, we need to throw an error to prevent execution
-  throw new Error('Required utility functions not found. Make sure utils.js is loaded before this file.');
+/* global BinaryHeap, manhattanIndex */
+
+if (typeof BinaryHeap === 'undefined' || typeof manhattanIndex === 'undefined') {
+  throw new Error(
+    'Pathfinding dependencies missing. Load utils.js and data-structures.js first.'
+  );
 }
 
-/**
- * Priority Queue implementation for Dijkstra and A*
- */
-class MinPriorityQueue {
-  constructor(priorityFunction) {
-    this.items = [];
-    this.priority = priorityFunction || ((item) => item.priority);
-  }
-
-  /**
-   * Add item to queue
-   * @param {*} element - Element to add
-   */
-  enqueue(element) {
-    this.items.push(element);
-    this.items.sort((a, b) => this.priority(a) - this.priority(b));
-  }
-
-  /**
-   * Remove and return highest priority item
-   * @returns {*} Highest priority element
-   */
-  dequeue() {
-    return this.items.shift();
-  }
-
-  /**
-   * Check if queue is empty
-   * @returns {boolean} True if empty
-   */
-  isEmpty() {
-    return this.items.length === 0;
-  }
-
-  /**
-   * Get queue size
-   * @returns {number} Number of items in queue
-   */
-  size() {
-    return this.items.length;
-  }
-}
+const NO_PARENT = -1;
+const INF = 0x7fffffff;
 
 /**
- * Base pathfinding algorithm class
+ * Base class. Subclasses seed their frontier in the constructor and implement
+ * `step()`, which must call `_finish()` when the search ends.
  */
 class PathfindingAlgorithm {
-  constructor(maze, start, goal) {
-    this.maze = maze;
-    this.start = start;
-    this.goal = goal;
-    this.mazeSize = maze.length;
-    this.visited = create2DArray(this.mazeSize, this.mazeSize, false);
-    this.cameFrom = create2DArray(this.mazeSize, this.mazeSize, null);
-    this.isRunning = false;
-    this.onStep = null; // Callback for visualization
-    this.onComplete = null; // Callback for completion
-  }
-
   /**
-   * Check if position is the goal
-   * @param {number} x - X coordinate
-   * @param {number} y - Y coordinate
-   * @returns {boolean} True if position is goal
+   * @param {Grid} grid
+   * @param {number} startIndex
+   * @param {number} goalIndex
    */
-  isGoal(x, y) {
-    return x === this.goal.x && y === this.goal.y;
+  constructor(grid, startIndex, goalIndex) {
+    this.grid = grid;
+    this.start = startIndex;
+    this.goal = goalIndex;
+
+    this.visited = new Uint8Array(grid.cellCount);
+    this.cameFrom = new Int32Array(grid.cellCount).fill(NO_PARENT);
+
+    this.nodesExplored = 0;
+    this.frontierSize = 0;
+    this.finished = false;
+    this.found = false;
+    this.path = null;
+
+    this._scratch = []; // Reused by grid.neighbors() to avoid per-step allocation.
   }
 
   /**
-   * Check if position is valid and unvisited
-   * @param {number} x - X coordinate
-   * @param {number} y - Y coordinate
-   * @returns {boolean} True if valid move
+   * Passable, unvisited neighbor indices of `i`.
+   * @returns {number[]} (the algorithm's reusable scratch array)
    */
-  isValidMove(x, y) {
-    return (
-      isValidCoordinate(x, y, this.mazeSize) &&
-      this.maze[y][x] === 0 &&
-      !this.visited[y][x]
-    );
+  openNeighbors(i) {
+    const all = this.grid.neighbors(i, this._scratch);
+    let w = 0;
+    for (let r = 0; r < all.length; r++) {
+      const n = all[r];
+      if (this.grid.cells[n] === 0 && !this.visited[n]) all[w++] = n;
+    }
+    all.length = w;
+    return all;
   }
 
   /**
-   * Reconstruct path from goal to start
-   * @returns {Array} Path as array of coordinates
+   * Rebuild the path of indices from goal back to start via the cameFrom chain.
+   * @returns {number[]}
    */
   reconstructPath() {
     const path = [];
-    let current = { x: this.goal.x, y: this.goal.y };
-
-    while (current) {
-      path.push({ x: current.x, y: current.y });
-      current = this.cameFrom[current.y][current.x];
+    let current = this.goal;
+    while (current !== NO_PARENT) {
+      path.push(current);
+      if (current === this.start) break;
+      current = this.cameFrom[current];
     }
-
     return path.reverse();
   }
 
   /**
-   * Get valid neighbors for a position
-   * @param {number} x - X coordinate
-   * @param {number} y - Y coordinate
-   * @returns {Array} Array of valid neighbor coordinates
+   * Mark the search complete, reconstructing the path if the goal was found.
+   * @protected
    */
-  getValidNeighbors(x, y) {
-    return getDirections(x, y).filter(({ x: nx, y: ny }) =>
-      this.isValidMove(nx, ny)
-    );
+  _finish(found) {
+    this.finished = true;
+    this.found = found;
+    this.path = found ? this.reconstructPath() : null;
+  }
+
+  /** @protected */
+  _doneResult() {
+    return { done: true, found: this.found, current: -1, path: this.path };
   }
 
   /**
-   * Stop the algorithm
+   * Run the search to completion with no animation. Used by compare mode.
+   * @returns {{found: boolean, path: number[]|null, nodesExplored: number}}
    */
-  stop() {
-    this.isRunning = false;
+  runToCompletion() {
+    while (!this.finished) this.step();
+    return { found: this.found, path: this.path, nodesExplored: this.nodesExplored };
   }
 }
 
 /**
- * Breadth-First Search implementation
- * Guarantees shortest path in unweighted graphs
+ * Breadth-First Search — explores by distance, guaranteeing a shortest path.
  */
 class BFSAlgorithm extends PathfindingAlgorithm {
-  constructor(maze, start, goal) {
-    super(maze, start, goal);
-    this.queue = [];
+  constructor(grid, startIndex, goalIndex) {
+    super(grid, startIndex, goalIndex);
+    this.queue = [startIndex];
+    this.head = 0; // Index cursor avoids O(n) Array.shift on every step.
+    this.visited[startIndex] = 1;
+    this.frontierSize = 1;
   }
 
-  /**
-   * Start BFS algorithm
-   * @param {Function} onStep - Callback for each step
-   * @param {Function} onComplete - Callback for completion
-   */
-  start(onStep, onComplete) {
-    this.onStep = onStep;
-    this.onComplete = onComplete;
-    this.isRunning = true;
-
-    this.queue.push(this.start);
-    this.visited[this.start.y][this.start.x] = true;
-
-    this._step();
-  }
-
-  /**
-   * Execute one step of BFS
-   * @private
-   */
-  _step() {
-    if (!this.isRunning || this.queue.length === 0) {
-      this.onComplete && this.onComplete(null);
-      return;
+  step() {
+    if (this.finished) return this._doneResult();
+    if (this.head >= this.queue.length) {
+      this._finish(false);
+      return this._doneResult();
     }
 
-    const current = this.queue.shift();
-    
-    if (this.onStep) {
-      this.onStep(current.x, current.y);
+    const current = this.queue[this.head++];
+    this.nodesExplored++;
+
+    if (current === this.goal) {
+      this._finish(true);
+      return { done: true, found: true, current, path: this.path };
     }
 
-    if (this.isGoal(current.x, current.y)) {
-      const path = this.reconstructPath();
-      this.onComplete && this.onComplete(path);
-      return;
+    const neighbors = this.openNeighbors(current);
+    for (let k = 0; k < neighbors.length; k++) {
+      const n = neighbors[k];
+      this.visited[n] = 1;
+      this.cameFrom[n] = current;
+      this.queue.push(n);
     }
 
-    const neighbors = this.getValidNeighbors(current.x, current.y);
-    for (const neighbor of neighbors) {
-      this.visited[neighbor.y][neighbor.x] = true;
-      this.cameFrom[neighbor.y][neighbor.x] = current;
-      this.queue.push(neighbor);
-    }
-
-    // Continue with next step
-    setTimeout(() => this._step(), 5);
+    this.frontierSize = this.queue.length - this.head;
+    return { done: false, found: false, current, path: null };
   }
 }
 
 /**
- * Depth-First Search implementation
- * Fast exploration but doesn't guarantee shortest path
+ * Depth-First Search — dives deep along each branch; not shortest-path.
  */
 class DFSAlgorithm extends PathfindingAlgorithm {
-  constructor(maze, start, goal) {
-    super(maze, start, goal);
-    this.stack = [];
+  constructor(grid, startIndex, goalIndex) {
+    super(grid, startIndex, goalIndex);
+    this.stack = [startIndex];
+    this.visited[startIndex] = 1;
+    this.frontierSize = 1;
   }
 
-  /**
-   * Start DFS algorithm
-   * @param {Function} onStep - Callback for each step
-   * @param {Function} onComplete - Callback for completion
-   */
-  start(onStep, onComplete) {
-    this.onStep = onStep;
-    this.onComplete = onComplete;
-    this.isRunning = true;
-
-    this.stack.push(this.start);
-    this.visited[this.start.y][this.start.x] = true;
-
-    this._step();
-  }
-
-  /**
-   * Execute one step of DFS
-   * @private
-   */
-  _step() {
-    if (!this.isRunning || this.stack.length === 0) {
-      this.onComplete && this.onComplete(null);
-      return;
+  step() {
+    if (this.finished) return this._doneResult();
+    if (this.stack.length === 0) {
+      this._finish(false);
+      return this._doneResult();
     }
 
     const current = this.stack.pop();
-    
-    if (this.onStep) {
-      this.onStep(current.x, current.y);
+    this.nodesExplored++;
+
+    if (current === this.goal) {
+      this._finish(true);
+      return { done: true, found: true, current, path: this.path };
     }
 
-    if (this.isGoal(current.x, current.y)) {
-      const path = this.reconstructPath();
-      this.onComplete && this.onComplete(path);
-      return;
+    const neighbors = this.openNeighbors(current);
+    for (let k = 0; k < neighbors.length; k++) {
+      const n = neighbors[k];
+      this.visited[n] = 1;
+      this.cameFrom[n] = current;
+      this.stack.push(n);
     }
 
-    const neighbors = this.getValidNeighbors(current.x, current.y);
-    for (const neighbor of neighbors) {
-      this.visited[neighbor.y][neighbor.x] = true;
-      this.cameFrom[neighbor.y][neighbor.x] = current;
-      this.stack.push(neighbor);
-    }
-
-    // Continue with next step
-    setTimeout(() => this._step(), 5);
+    this.frontierSize = this.stack.length;
+    return { done: false, found: false, current, path: null };
   }
 }
 
 /**
- * Dijkstra's Algorithm implementation
- * Guarantees shortest path in weighted graphs
+ * Dijkstra's algorithm — uniform-cost expansion via a binary min-heap.
+ * On a unit-weight maze this matches BFS's shortest path.
  */
 class DijkstraAlgorithm extends PathfindingAlgorithm {
-  constructor(maze, start, goal) {
-    super(maze, start, goal);
-    this.distances = create2DArray(this.mazeSize, this.mazeSize, Infinity);
-    this.pq = new MinPriorityQueue(node => node.distance);
+  constructor(grid, startIndex, goalIndex) {
+    super(grid, startIndex, goalIndex);
+    this.distances = new Int32Array(grid.cellCount).fill(INF);
+    this.heap = new BinaryHeap((a, b) => a.priority - b.priority);
+    this.distances[startIndex] = 0;
+    this.heap.push({ i: startIndex, priority: 0 });
+    this.frontierSize = 1;
+  }
+
+  step() {
+    if (this.finished) return this._doneResult();
+    if (this.heap.isEmpty()) {
+      this._finish(false);
+      return this._doneResult();
+    }
+
+    const current = this.heap.pop().i;
+    if (this.visited[current]) {
+      this.frontierSize = this.heap.size();
+      return { done: false, found: false, current: -1, path: null };
+    }
+    this.visited[current] = 1;
+    this.nodesExplored++;
+
+    if (current === this.goal) {
+      this._finish(true);
+      return { done: true, found: true, current, path: this.path };
+    }
+
+    this._relax(current);
+    this.frontierSize = this.heap.size();
+    return { done: false, found: false, current, path: null };
   }
 
   /**
-   * Start Dijkstra's algorithm
-   * @param {Function} onStep - Callback for each step
-   * @param {Function} onComplete - Callback for completion
+   * Relax edges out of `current`. Split out so A* can override the priority.
+   * @protected
    */
-  start(onStep, onComplete) {
-    this.onStep = onStep;
-    this.onComplete = onComplete;
-    this.isRunning = true;
-
-    this.distances[this.start.y][this.start.x] = 0;
-    this.pq.enqueue({
-      x: this.start.x,
-      y: this.start.y,
-      distance: 0
-    });
-
-    this._step();
-  }
-
-  /**
-   * Execute one step of Dijkstra's algorithm
-   * @private
-   */
-  _step() {
-    if (!this.isRunning || this.pq.isEmpty()) {
-      this.onComplete && this.onComplete(null);
-      return;
-    }
-
-    const current = this.pq.dequeue();
-    
-    if (this.visited[current.y][current.x]) {
-      setTimeout(() => this._step(), 5);
-      return;
-    }
-
-    this.visited[current.y][current.x] = true;
-    
-    if (this.onStep) {
-      this.onStep(current.x, current.y);
-    }
-
-    if (this.isGoal(current.x, current.y)) {
-      const path = this.reconstructPath();
-      this.onComplete && this.onComplete(path);
-      return;
-    }
-
-    const neighbors = getDirections(current.x, current.y).filter(({ x, y }) =>
-      isValidCoordinate(x, y, this.mazeSize) &&
-      this.maze[y][x] === 0 &&
-      !this.visited[y][x]
-    );
-
-    for (const neighbor of neighbors) {
-      const alt = this.distances[current.y][current.x] + 1;
-      if (alt < this.distances[neighbor.y][neighbor.x]) {
-        this.distances[neighbor.y][neighbor.x] = alt;
-        this.cameFrom[neighbor.y][neighbor.x] = current;
-        this.pq.enqueue({
-          x: neighbor.x,
-          y: neighbor.y,
-          distance: alt
-        });
+  _relax(current) {
+    const neighbors = this.openNeighbors(current);
+    const base = this.distances[current] + 1;
+    for (let k = 0; k < neighbors.length; k++) {
+      const n = neighbors[k];
+      if (base < this.distances[n]) {
+        this.distances[n] = base;
+        this.cameFrom[n] = current;
+        this.heap.push({ i: n, priority: base });
       }
     }
-
-    // Continue with next step
-    setTimeout(() => this._step(), 5);
   }
 }
 
 /**
- * A* Algorithm implementation
- * Efficient directed search using heuristics
+ * A* — Dijkstra guided toward the goal by a Manhattan-distance heuristic
+ * (admissible in both 2D and 3D since moves are unit-cost and orthogonal).
  */
-class AStarAlgorithm extends PathfindingAlgorithm {
-  constructor(maze, start, goal) {
-    super(maze, start, goal);
-    this.gScore = create2DArray(this.mazeSize, this.mazeSize, Infinity);
-    this.fScore = create2DArray(this.mazeSize, this.mazeSize, Infinity);
-    this.openSet = [];
+class AStarAlgorithm extends DijkstraAlgorithm {
+  constructor(grid, startIndex, goalIndex) {
+    super(grid, startIndex, goalIndex);
+    // Reset the frontier to order by f = g + h instead of g alone.
+    this.heap = new BinaryHeap((a, b) => a.priority - b.priority);
+    this.heap.push({ i: startIndex, priority: this._heuristic(startIndex) });
+    this.frontierSize = 1;
   }
 
-  /**
-   * Heuristic function (Manhattan distance)
-   * @param {number} x - X coordinate
-   * @param {number} y - Y coordinate
-   * @returns {number} Heuristic value
-   */
-  heuristic(x, y) {
-    return manhattanDistance(x, y, this.goal.x, this.goal.y);
+  /** @protected @returns {number} Manhattan distance to the goal. */
+  _heuristic(i) {
+    return manhattanIndex(this.grid, i, this.goal);
   }
 
-  /**
-   * Start A* algorithm
-   * @param {Function} onStep - Callback for each step
-   * @param {Function} onComplete - Callback for completion
-   */
-  start(onStep, onComplete) {
-    this.onStep = onStep;
-    this.onComplete = onComplete;
-    this.isRunning = true;
-
-    this.gScore[this.start.y][this.start.x] = 0;
-    this.fScore[this.start.y][this.start.x] = this.heuristic(this.start.x, this.start.y);
-    
-    this.openSet.push({
-      x: this.start.x,
-      y: this.start.y,
-      f: this.fScore[this.start.y][this.start.x]
-    });
-
-    this._step();
-  }
-
-  /**
-   * Execute one step of A* algorithm
-   * @private
-   */
-  _step() {
-    if (!this.isRunning || this.openSet.length === 0) {
-      this.onComplete && this.onComplete(null);
-      return;
-    }
-
-    // Find node with lowest f-score
-    this.openSet.sort((a, b) => a.f - b.f);
-    const current = this.openSet.shift();
-    
-    if (this.visited[current.y][current.x]) {
-      setTimeout(() => this._step(), 5);
-      return;
-    }
-
-    this.visited[current.y][current.x] = true;
-    
-    if (this.onStep) {
-      this.onStep(current.x, current.y);
-    }
-
-    if (this.isGoal(current.x, current.y)) {
-      const path = this.reconstructPath();
-      this.onComplete && this.onComplete(path);
-      return;
-    }
-
-    const neighbors = getDirections(current.x, current.y).filter(({ x, y }) =>
-      isValidCoordinate(x, y, this.mazeSize) &&
-      this.maze[y][x] === 0 &&
-      !this.visited[y][x]
-    );
-
-    for (const neighbor of neighbors) {
-      const tentativeGScore = this.gScore[current.y][current.x] + 1;
-
-      if (tentativeGScore < this.gScore[neighbor.y][neighbor.x]) {
-        this.cameFrom[neighbor.y][neighbor.x] = current;
-        this.gScore[neighbor.y][neighbor.x] = tentativeGScore;
-        this.fScore[neighbor.y][neighbor.x] = tentativeGScore + this.heuristic(neighbor.x, neighbor.y);
-        
-        this.openSet.push({
-          x: neighbor.x,
-          y: neighbor.y,
-          f: this.fScore[neighbor.y][neighbor.x]
-        });
+  /** @protected */
+  _relax(current) {
+    const neighbors = this.openNeighbors(current);
+    const tentativeG = this.distances[current] + 1;
+    for (let k = 0; k < neighbors.length; k++) {
+      const n = neighbors[k];
+      if (tentativeG < this.distances[n]) {
+        this.distances[n] = tentativeG;
+        this.cameFrom[n] = current;
+        this.heap.push({ i: n, priority: tentativeG + this._heuristic(n) });
       }
     }
-
-    // Continue with next step
-    setTimeout(() => this._step(), 5);
   }
 }
 
+/** Display names for each algorithm key. */
+const ALGORITHM_NAMES = {
+  bfs: 'Breadth-First Search',
+  dfs: 'Depth-First Search',
+  dijkstra: 'Dijkstra\'s Algorithm',
+  astar: 'A* Search'
+};
+
 /**
- * Algorithm factory function
- * @param {string} algorithmType - Type of algorithm ('bfs', 'dfs', 'dijkstra', 'astar')
- * @param {Array} maze - 2D maze array
- * @param {Object} start - Start position {x, y}
- * @param {Object} goal - Goal position {x, y}
- * @returns {PathfindingAlgorithm} Algorithm instance
+ * Create a pathfinding algorithm instance.
+ * @param {string} algorithmType - 'bfs' | 'dfs' | 'dijkstra' | 'astar'.
+ * @param {Grid} grid
+ * @param {number} startIndex
+ * @param {number} goalIndex
+ * @returns {PathfindingAlgorithm}
  */
-function createAlgorithm(algorithmType, maze, start, goal) {
-  // Make sure all required functions are available
-  if (typeof create2DArray !== 'function' || 
-      typeof isValidCoordinate !== 'function' || 
-      typeof manhattanDistance !== 'function' || 
-      typeof getDirections !== 'function') {
-    throw new Error('Required utility functions not available. Please check utils.js is loaded.');
+function createAlgorithm(algorithmType, grid, startIndex, goalIndex) {
+  if (!grid || typeof grid.cellCount !== 'number' || !grid.cells) {
+    throw new Error('Invalid grid');
   }
-  // Safety check to ensure we have a valid maze with expected format
-  if (!maze || !Array.isArray(maze) || maze.length === 0 || !Array.isArray(maze[0])) {
-    throw new Error('Invalid maze format');
+  if (!Number.isInteger(startIndex) || !Number.isInteger(goalIndex)) {
+    throw new Error('Invalid start or goal index');
   }
-  
-  // Safety check for start and goal positions
-  if (!start || !goal || typeof start.x === 'undefined' || typeof start.y === 'undefined' || 
-      typeof goal.x === 'undefined' || typeof goal.y === 'undefined') {
-    throw new Error('Invalid start or goal positions');
-  }
-  
+
   switch ((algorithmType || '').toLowerCase()) {
     case 'bfs':
-      return new BFSAlgorithm(maze, start, goal);
+      return new BFSAlgorithm(grid, startIndex, goalIndex);
     case 'dfs':
-      return new DFSAlgorithm(maze, start, goal);
+      return new DFSAlgorithm(grid, startIndex, goalIndex);
     case 'dijkstra':
-      return new DijkstraAlgorithm(maze, start, goal);
+      return new DijkstraAlgorithm(grid, startIndex, goalIndex);
     case 'astar':
-      return new AStarAlgorithm(maze, start, goal);
+      return new AStarAlgorithm(grid, startIndex, goalIndex);
     default:
       throw new Error(`Unknown algorithm type: ${algorithmType}`);
   }
 }
 
-// Ensure the createAlgorithm function is available in the global scope
-// This ensures that other modules can access it without issues
 if (typeof window !== 'undefined') {
   window.createAlgorithm = createAlgorithm;
+  window.ALGORITHM_NAMES = ALGORITHM_NAMES;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    PathfindingAlgorithm,
+    BFSAlgorithm,
+    DFSAlgorithm,
+    DijkstraAlgorithm,
+    AStarAlgorithm,
+    createAlgorithm,
+    ALGORITHM_NAMES
+  };
 }

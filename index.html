@@ -3,96 +3,187 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Interactive Maze Generator & Solver with multiple pathfinding algorithms">
+  <meta name="description" content="Interactive maze generator and pathfinding visualizer with BFS, DFS, Dijkstra, and A*.">
   <meta name="keywords" content="maze, pathfinding, algorithms, visualization, BFS, DFS, Dijkstra, A*">
-  <meta name="author" content="Your Name">
-  
-  <title>SMaze - Interactive Maze Generator & Solver</title>
-  
-  <!-- Preconnect to external resources -->
+  <meta name="theme-color" content="#0d1117">
+
+  <title>SMaze — Interactive Maze Generator & Pathfinding Visualizer</title>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  
-  <!-- External stylesheets -->
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="src/css/styles.css">
 </head>
 <body>
-  <header>
-    <h1>SMaze</h1>
-    <p class="subtitle">Interactive Maze Generator & Solver</p>
+  <header class="site-header">
+    <h1 class="logo">S<span>Maze</span></h1>
+    <p class="subtitle">Generate mazes &amp; watch pathfinding algorithms think.</p>
   </header>
-  
-  <main>
-    <section class="game-area" role="main" aria-label="Maze game area">
-      <canvas 
-        id="mazeCanvas" 
-        width="600" 
-        height="600"
-        aria-label="Maze visualization canvas"
-        role="img">
-        Your browser does not support the HTML5 Canvas element.
-      </canvas>
-      
-      <div id="timer" aria-live="polite" role="timer">
-        Time: 0.00s
+
+  <main class="app">
+    <!-- Maze stage -->
+    <section class="stage" aria-label="Maze">
+      <div class="canvas-wrap">
+        <canvas
+          id="mazeCanvas"
+          width="600"
+          height="600"
+          role="img"
+          aria-label="Maze visualization. Use WASD or arrow keys to move from the start to the goal.">
+          Your browser does not support the HTML5 Canvas element.
+        </canvas>
       </div>
-    </section>
-    
-    <section class="controls" role="group" aria-label="Game controls">
-      <div class="control-group">
-        <label for="algorithm">Algorithm:</label>
-        <select id="algorithm" aria-describedby="algorithm-help">
-          <option value="bfs">Breadth-First Search</option>
-          <option value="dfs">Depth-First Search</option>
-          <option value="dijkstra">Dijkstra's Algorithm</option>
-          <option value="astar">A* Algorithm</option>
-        </select>
-        <small id="algorithm-help">Choose a pathfinding algorithm to solve the maze</small>
-      </div>
-      
-      <div class="control-group">
-        <button id="solveBtn" type="button">Solve Maze</button>
-        <button id="stopBtn" type="button">Stop Solving</button>
-        <button id="resetBtn" type="button">Reset Player</button>
-        <button id="newMazeBtn" type="button">Generate New Maze</button>
-      </div>
-      
-      <div class="control-group">
-        <label for="size">Maze Size:</label>
-        <input 
-          type="number" 
-          id="size" 
-          value="25" 
-          min="10" 
-          max="100"
-          aria-describedby="size-help">
-        <button id="changeSizeBtn" type="button">Change Size</button>
-        <small id="size-help">Set maze dimensions (10-100)</small>
-      </div>
-    </section>
-    
-    <section class="instructions" role="region" aria-label="Game instructions">
-      <h2>Instructions</h2>
-      <ul>
-        <li><strong>Movement:</strong> Use WASD keys to move the blue player</li>
-        <li><strong>Goal:</strong> Reach the green target in the bottom-right corner</li>
-        <li><strong>Auto-solve:</strong> Select an algorithm and click "Solve Maze"</li>
-        <li><strong>Size:</strong> Adjust maze complexity with the size control</li>
+
+      <ul class="legend" aria-label="Legend">
+        <li><span class="swatch swatch--player"></span>Start / Player</li>
+        <li><span class="swatch swatch--goal"></span>Goal</li>
+        <li><span class="swatch swatch--frontier"></span>Search frontier</li>
+        <li><span class="swatch swatch--visited"></span>Explored</li>
+        <li><span class="swatch swatch--solution"></span>Solution path</li>
+        <li><span class="swatch swatch--wall"></span>Wall</li>
       </ul>
+
+      <nav id="dpad" class="dpad" aria-label="On-screen movement controls">
+        <button type="button" class="dpad__btn dpad__up" data-dir="up" aria-label="Move up">▲</button>
+        <button type="button" class="dpad__btn dpad__left" data-dir="left" aria-label="Move left">◀</button>
+        <button type="button" class="dpad__btn dpad__right" data-dir="right" aria-label="Move right">▶</button>
+        <button type="button" class="dpad__btn dpad__down" data-dir="down" aria-label="Move down">▼</button>
+      </nav>
     </section>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <!-- Live stats -->
+      <section class="panel stats" aria-label="Live statistics" aria-live="polite">
+        <header class="panel__head">
+          <h2>Stats</h2>
+          <span id="statStatus" class="status-pill">Ready</span>
+        </header>
+        <div class="stat-grid">
+          <div class="stat"><span class="stat__label">Time</span><span id="statTime" class="stat__value">0.00s</span></div>
+          <div class="stat"><span class="stat__label">Nodes explored</span><span id="statNodes" class="stat__value">0</span></div>
+          <div class="stat"><span class="stat__label">Frontier</span><span id="statFrontier" class="stat__value">0</span></div>
+          <div class="stat"><span class="stat__label">Path length</span><span id="statPath" class="stat__value">—</span></div>
+          <div class="stat"><span class="stat__label">Explored</span><span id="statExplored" class="stat__value">0.0%</span></div>
+          <div class="stat"><span class="stat__label">Your moves</span><span id="statMoves" class="stat__value">0</span></div>
+        </div>
+        <div class="progress" aria-hidden="true"><span id="exploreBar" class="progress__bar"></span></div>
+      </section>
+
+      <!-- Solve controls -->
+      <section class="panel controls" aria-label="Solve controls">
+        <h2>Solve</h2>
+        <div class="field">
+          <label for="algorithm">Pathfinding algorithm</label>
+          <select id="algorithm">
+            <option value="bfs">Breadth-First Search</option>
+            <option value="dfs">Depth-First Search</option>
+            <option value="dijkstra">Dijkstra's Algorithm</option>
+            <option value="astar">A* Search</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="speed">Animation speed <output id="speedValue">20</output></label>
+          <input type="range" id="speed" min="1" max="100" value="20">
+        </div>
+        <div class="btn-row">
+          <button id="solveBtn" type="button" class="btn btn--primary">Solve</button>
+          <button id="stopBtn" type="button" class="btn" disabled>Stop</button>
+          <button id="compareBtn" type="button" class="btn">Compare all</button>
+        </div>
+      </section>
+
+      <!-- Generation controls -->
+      <section class="panel controls" aria-label="Maze controls">
+        <h2>Maze</h2>
+        <div class="field">
+          <label for="dimensions">Dimensions</label>
+          <select id="dimensions">
+            <option value="2">2D (flat)</option>
+            <option value="3">3D (volume)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="genAlgorithm">Generation algorithm</label>
+          <select id="genAlgorithm">
+            <option value="kruskal">Kruskal's (balanced)</option>
+            <option value="backtracker">Recursive Backtracker (winding)</option>
+            <option value="prim">Prim's (branchy)</option>
+          </select>
+        </div>
+        <div class="field field--inline">
+          <label for="size">Size</label>
+          <input type="number" id="size" value="25" min="11" max="7071" step="2">
+          <button id="changeSizeBtn" type="button" class="btn btn--sm">Apply</button>
+        </div>
+        <div class="field field--inline" aria-label="View controls">
+          <label>View</label>
+          <button id="zoomInBtn" type="button" class="btn btn--sm" aria-label="Zoom in">Zoom +</button>
+          <button id="zoomOutBtn" type="button" class="btn btn--sm" aria-label="Zoom out">Zoom −</button>
+          <button id="fitViewBtn" type="button" class="btn btn--sm" aria-label="Fit maze to view">Fit</button>
+        </div>
+        <div class="field field--inline">
+          <label for="seed">Seed</label>
+          <input type="number" id="seed" value="0" min="0">
+          <button id="applySeedBtn" type="button" class="btn btn--sm">Use</button>
+          <button id="randomSeedBtn" type="button" class="btn btn--sm" aria-label="Random seed">🎲</button>
+        </div>
+        <div class="btn-row">
+          <button id="newMazeBtn" type="button" class="btn btn--primary">New Maze</button>
+          <button id="resetBtn" type="button" class="btn">Reset</button>
+        </div>
+      </section>
+
+      <!-- Compare results -->
+      <section class="panel compare" id="compareResults" aria-label="Algorithm comparison" hidden>
+        <h2>Comparison</h2>
+        <table class="compare-table">
+          <thead>
+            <tr><th>Algorithm</th><th>Path</th><th>Nodes</th><th>Time</th></tr>
+          </thead>
+          <tbody id="compareTableBody"></tbody>
+        </table>
+        <p class="compare-note">Run on the current maze. <span class="is-best-key">Best</span> values highlighted.</p>
+      </section>
+
+      <!-- Instructions -->
+      <section class="panel instructions" aria-label="How to play">
+        <h2>How to play</h2>
+        <ul>
+          <li><strong>Move:</strong> WASD / arrows, swipe, or the on-screen pad</li>
+          <li><strong>Solve:</strong> pick an algorithm, press <kbd>Space</kbd></li>
+          <li><strong>New maze:</strong> <kbd>N</kbd> · <strong>Reset:</strong> <kbd>R</kbd> · <strong>Compare:</strong> <kbd>C</kbd></li>
+          <li><strong>Goal:</strong> reach the green marker</li>
+        </ul>
+      </section>
+    </aside>
   </main>
-  
-  <div id="message" aria-live="assertive" role="alert"></div>
-  
-  <footer>
-    <p>&copy; 2025 SMaze - Educational Pathfinding Visualization</p>
+
+  <div id="toast-container" class="toast-container" role="status" aria-live="polite"></div>
+
+  <div id="winOverlay" class="win-overlay" role="dialog" aria-modal="true" aria-labelledby="winTitle" hidden>
+    <div class="win-card">
+      <h2 id="winTitle">🎉 Solved!</h2>
+      <p id="winStats" class="win-stats"></p>
+      <button id="winCloseBtn" type="button" class="btn btn--primary">Play again</button>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <p>SMaze — educational pathfinding visualization. Built with vanilla JavaScript.</p>
   </footer>
-  
-  <!-- JavaScript modules -->
+
+  <!-- Three.js (3D renderer) — loaded before renderer-3d.js. -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+
+  <!-- Scripts: load order matters (each layer depends on the previous). -->
   <script src="src/js/utils.js"></script>
+  <script src="src/js/grid.js"></script>
+  <script src="src/js/data-structures.js"></script>
   <script src="src/js/maze-generator.js"></script>
   <script src="src/js/pathfinding-algorithms.js"></script>
+  <script src="src/js/renderer-2d.js"></script>
+  <script src="src/js/renderer-3d.js"></script>
   <script src="src/js/game.js"></script>
   <script src="src/js/app.js"></script>
 </body>
