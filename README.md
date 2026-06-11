@@ -1,124 +1,73 @@
-# SMaze — Interactive Maze Generator & Pathfinding Visualizer
+# SMaze 
+**The definitive interactive maze generation and pathfinding engine.**
 
-A lightning-fast, highly accessible 2D & 3D maze generator and pathfinding visualizer built on top of **vanilla JavaScript**—requiring no underlying framework or build steps. 
+Welcome to SMaze—a lightning-fast, zero-dependency engine that transforms complex search algorithms into a stunning, interactive visual experience. Whether you are an educator demonstrating graph theory, a developer benchmarking pathfinding performance, or a gamer looking to conquer massive 3D labyrinths, SMaze delivers unparalleled speed and precision.
 
-Whether generating a classic flat maze or a complex 3D volume, you can instantly observe how popular search algorithms navigate the topology. SMaze visualizes how algorithms "think" during the search and lets you compare their performance before attempting to conquer the maze yourself.
-
-## ✨ Features
-
-### High-Performance Multi-Dimensional Grid
-- **2D & 3D Support**: Generate traditional planar mazes or spatial 3D volumes (rendered via Three.js), scaling seamlessly up to massive sizes.
-- **Memory Efficient**: Using a shared flat index `Uint8Array` architecture limits overhead to roughly ~1 byte per cell—allowing you to generate mazes with tens of thousands of cells without encountering browser memory ceiling issues.
-
-### Maze Generation Algorithms
-Choose from three algorithmic strategies, each yielding unique topographic textures:
-- **Kruskal's** (Union-Find) — Generates highly balanced mazes with many intertwining corridors.
-- **Recursive Backtracker** — Creates lengthy, winding passages featuring deep dead-ends.
-- **Prim's** — Produces a "bushy" maze with numerous, highly condensed short branches.
-- **Reproducible Seeds** — Powered by a Mulberry32 PRNG, every generated maze can be reliably reproduced and shared via URL parameters.
-
-### Pathfinding Visualization
-- **Live Algorithm Races**: Watch Breadth-First Search (BFS), Depth-First Search (DFS), Dijkstra's Algorithm, and A* Pathfinding crawl the grid step-by-step.
-- **Exploration Heatmap**: Analyzed cells emit a cool→warm color gradient matching their chronological search order, clearly separating algorithmic strategies visually.
-- **Animated Solution Path**: Winning paths are presented with an advancing glowing trail highlight.
-- **Compare Mode**: Sequentially race all 4 algorithms on the active seed to generate a tabular comparison of path length, nodes evaluated, and execution time.
-
-### Real-Time Instrumentation
-Heads-up statistics accurately chart variables in real-time, matching standard computational complexity metrics: execution time, nodes explored, frontier queuing sizes, active path length, overall maze percentage explored, and manual moves. 
-
-### Fully Playable
-- **Input Flexibility**: Use `WASD` / Arrow keys on desktop, or swipe / on-screen D-Pad for mobile interactivity.
-- Play against the clock and view an end-of-game overlay analyzing your completion time and efficiency.
-
-### Accessibility & Quality of Life
-- **Responsive Layout**: Adjusts UI naturally to accommodate desktop and mobile layouts.
-- **A11y Compliant**: Full keyboard operability, explicit visual focus rings, `aria-live` region integrations for dynamic statistics, and respect for `prefers-reduced-motion` queries.
-- **High-DPI Optimized**: Supports retina/4K display rendering flawlessly on `<canvas>`.
-- **Bookmarkable States**: The current generator, solver, seed, dimension, and size configurations are automatically synced to the browser URL hash for frictionless sharing.
+Experience the beauty of algorithms seamlessly rendered in 2D and 3D. 
 
 ---
 
-## 🚀 Quick Start
+## Why SMaze?
 
-No build step is required! You can securely launch it by simply opening `index.html` in your web browser. 
+### 🌌 Infinite Dimensions: 2D & 3D Spatial Rendering
+Break free from the grid. SMaze generates classic planar mazes as well as immersive 3D volumetric spaces using Three.js. Scale your environments dynamically without dropping a single frame.
 
-For local development and live-reloads:
+### ⚡ Engineered for Blistering Performance
+Under the hood, SMaze runs on a shared flat-index `Uint8Array` architecture. By maintaining a memory footprint of just ~1 byte per cell, SMaze effortlessly powers massive labyrinths containing tens of thousands of nodes while avoiding browser memory constraints.
 
+### 🏎️ The Algorithm Racing Engine
+Visualize and evaluate logic in real-time. Watch algorithms crawl the grid step-by-step, emitting a cool-to-warm thermal heatmap that visualizes chronological search priority. 
+- **Compare Mode**: Race Breadth-First Search (BFS), Depth-First Search (DFS), Dijkstra's, and A* simultaneously.
+- Validate performance through side-by-side matrices comparing path length, node evaluation limits, and execution speed.
+
+### 📊 Live Telemetry & Analytics
+Monitor your computational complexity on the fly. Active heads-up statistics provide real-time updates for:
+- Execution Time & Nodes Explored
+- Frontier Queuing Sizes
+- Active Path Length & Overall Maze Completion
+- Manual User Moves
+
+### 🎮 Fully Playable & Accessible
+SMaze isn't just an observation deck—it's a game. Challenge the algorithms by manually navigating the mazes on any device. 
+- **Cross-Platform Input**: Seamlessly supports `WASD`, Arrow keys, touch-swipes, and on-screen D-Pads.
+- **Accessibility First**: Full keyboard operability, ARIA-live regions for dynamic telemetry, visible focus states, and respect for `prefers-reduced-motion` settings.
+- **Shareable States**: Bookmark and share your exact scenario. Generator strategy, dimensions, and randomization seeds are continuously synced to your URL hash.
+
+---
+
+## Generation Strategies
+SMaze includes three distinct architectural generation algorithms, each yielding unique topographic flavors:
+- **Kruskal's (Union-Find):** Highly balanced networks with interwoven routing.
+- **Recursive Backtracker:** Deep, winding corridors with distinct dead-ends.
+- **Prim's Algorithm:** Dense, bushy topologies loaded with intense branching.
+
+All generations are powered by a **Mulberry32 PRNG**, making every maze 100% reproducible via its distinct seed.
+
+---
+
+## Get Started in Seconds
+SMaze requires **zero build steps** and **no heavy frameworks**. Simply open `index.html` to launch the platform locally.
+
+For development, hot-reloading, or extension:
 ```bash
-# Install development tooling (ESLint, Prettier, Live-Server)
+# Install lightweight dev tooling (ESLint, Prettier, Live-Server)
 npm install
 
-# Start a local dev server with hot-reload via live-server
+# Boot the local hot-reload environment
 npm run dev
-
-# Alternatively, serve statically
-npm run serve
 ```
 
-## ⌨️ Controls
-
-| Action | Input / Keys |
-| :--- | :--- |
-| **Move (Play)** | `W` `A` `S` `D` / Arrows / Swipe / On-screen D-pad |
-| **Solve / Stop** | `Space` |
-| **Generate New Maze** | `N` |
-| **Reset Maze** | `R` |
-| **Compare Mode** | `C` |
-| **Stop / Close Overlay** | `Esc` |
-
-## 🏗️ Project Architecture
-
-```text
-smaze/
-├── index.html                   # DOM scaffolding and script orchestration
-├── src/
-│   ├── css/
-│   │   └── styles.css           # Responsive styling overrides (dark theme)
-│   └── js/
-│       ├── utils.js             # General helpers, Toasting, Mulberry32 PRNG
-│       ├── grid.js              # High-performance 1D Uint8Array abstraction
-│       ├── data-structures.js   # BinaryHeap, UnionFind standard libraries
-│       ├── maze-generator.js    # Kruskal / Backtracker / Prim implementations
-│       ├── pathfinding-algorithms.js # Search algorithm logic (BFS/DFS/Dijkstra/A*)
-│       ├── renderer-2d.js       # HTML5 Canvas 2D render logic
-│       ├── renderer-3d.js       # Three.js 3D spatial render logic
-│       ├── game.js              # Core `requestAnimationFrame` loop + stats pipeline
-│       └── app.js               # Event bindings, routing logic, config handling
-├── package.json
-└── README.md
-```
-
-*Note: Core runtime scripts operate with a strict implicit dependency hierarchy, establishing robust fundamentals before attaching renderer and application logics.*
-
-## 📊 Standard Algorithm Matrix
-
-| Algorithm | Guarantees Shortest Path? | Strategy | Visual Signature |
-| :--- | :---: | :--- | :--- |
-| **Breadth-First Search (BFS)** | ✅ | Uniform distance exploration | Radiating wavefront |
-| **Depth-First Search (DFS)** | ❌ | Dive unconditionally, then backtrack | Long continuous tendrils |
-| **Dijkstra's Algorithm** | ✅ | Uniform-cost bounding (via Min-Heap) | Even/Steady chronological spread |
-| **A\*** | ✅ | Guided by specific heuristic (Manhattan) | Rapid steering toward the objective |
-
-*Note: Given the unit-weight uniformity of maze graph distances, BFS, Dijkstra, and A\* consistently find the shortest mathematical path. A\* achieves this with substantially fewer node explorations.*
-
-## 🛠️ Development Tools
-
-SMaze includes linting and formatting tooling ensuring clear code quality during forks or extensions.
+## Extensibility & Tooling
+Engineered with clean code practices in mind, SMaze includes built-in linting and formatting workflows, making it ready for integration into your next big project.
 
 ```bash
-# Report ESLint issues
-npm run lint
-
-# Auto-fix linting issues 
-npm run lint:fix
-
-# Format codebase using Prettier
-npm run format
+npm run lint       # Audit codebase
+npm run lint:fix   # Auto-resolve lint errors
+npm run format     # Prettier formatting
 ```
 
-## 📄 License
-
-Distributed under the MIT License. See [LICENSE](LICENSE) for detailed information.
+## Licensing
+SMaze is proudly open-source and free to use under the **MIT License**. See [LICENSE](LICENSE) for details.
 
 ---
-**SMaze** — Making algorithms beautiful, visual, and brilliantly interactive. 🎯
+**SMaze** — Elevating the standard for algorithmic visualization.
