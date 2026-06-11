@@ -1,121 +1,124 @@
 # SMaze — Interactive Maze Generator & Pathfinding Visualizer
 
-A fast, accessible maze generator and pathfinding visualizer built with
-**vanilla JavaScript** — no framework, no build step. Open `index.html` and go.
-Generate mazes with three different algorithms, watch BFS / DFS / Dijkstra / A\*
-explore them on a live heatmap, compare their performance, and play manually on
-desktop or mobile.
+A lightning-fast, highly accessible 2D & 3D maze generator and pathfinding visualizer built on top of **vanilla JavaScript**—requiring no underlying framework or build steps. 
+
+Whether generating a classic flat maze or a complex 3D volume, you can instantly observe how popular search algorithms navigate the topology. SMaze visualizes how algorithms "think" during the search and lets you compare their performance before attempting to conquer the maze yourself.
 
 ## ✨ Features
 
-### Maze generation
+### High-Performance Multi-Dimensional Grid
+- **2D & 3D Support**: Generate traditional planar mazes or spatial 3D volumes (rendered via Three.js), scaling seamlessly up to massive sizes.
+- **Memory Efficient**: Using a shared flat index `Uint8Array` architecture limits overhead to roughly ~1 byte per cell—allowing you to generate mazes with tens of thousands of cells without encountering browser memory ceiling issues.
 
-- **Three algorithms**, each with a distinct texture:
-  - **Kruskal's** (union-find) — balanced, many corridors
-  - **Recursive Backtracker** — long, winding passages
-  - **Prim's** — bushy, many short branches
-- **Reproducible seeds** — every maze has a seed you can share or re-enter.
-- **Sizes** from 11×11 to 99×99, generated instantly via union-find.
+### Maze Generation Algorithms
+Choose from three algorithmic strategies, each yielding unique topographic textures:
+- **Kruskal's** (Union-Find) — Generates highly balanced mazes with many intertwining corridors.
+- **Recursive Backtracker** — Creates lengthy, winding passages featuring deep dead-ends.
+- **Prim's** — Produces a "bushy" maze with numerous, highly condensed short branches.
+- **Reproducible Seeds** — Powered by a Mulberry32 PRNG, every generated maze can be reliably reproduced and shared via URL parameters.
 
-### Pathfinding visualization
+### Pathfinding Visualization
+- **Live Algorithm Races**: Watch Breadth-First Search (BFS), Depth-First Search (DFS), Dijkstra's Algorithm, and A* Pathfinding crawl the grid step-by-step.
+- **Exploration Heatmap**: Analyzed cells emit a cool→warm color gradient matching their chronological search order, clearly separating algorithmic strategies visually.
+- **Animated Solution Path**: Winning paths are presented with an advancing glowing trail highlight.
+- **Compare Mode**: Sequentially race all 4 algorithms on the active seed to generate a tabular comparison of path length, nodes evaluated, and execution time.
 
-- **BFS, DFS, Dijkstra's, and A\***, animated step-by-step.
-- **Exploration heatmap** — visited cells are colored on a cool→warm gradient by
-  search order, so each algorithm's strategy is visible at a glance.
-- **Animated solution reveal** with a glow trail.
-- **Adjustable animation speed** (smooth, `requestAnimationFrame`-driven).
-- **Compare mode** — run all four algorithms on the current maze and see a table
-  of path length, nodes explored, and run time.
+### Real-Time Instrumentation
+Heads-up statistics accurately chart variables in real-time, matching standard computational complexity metrics: execution time, nodes explored, frontier queuing sizes, active path length, overall maze percentage explored, and manual moves. 
 
-### Live stats
+### Fully Playable
+- **Input Flexibility**: Use `WASD` / Arrow keys on desktop, or swipe / on-screen D-Pad for mobile interactivity.
+- Play against the clock and view an end-of-game overlay analyzing your completion time and efficiency.
 
-Time, nodes explored, frontier size, path length, % of maze explored, and your
-manual move count — all updated in real time.
+### Accessibility & Quality of Life
+- **Responsive Layout**: Adjusts UI naturally to accommodate desktop and mobile layouts.
+- **A11y Compliant**: Full keyboard operability, explicit visual focus rings, `aria-live` region integrations for dynamic statistics, and respect for `prefers-reduced-motion` queries.
+- **High-DPI Optimized**: Supports retina/4K display rendering flawlessly on `<canvas>`.
+- **Bookmarkable States**: The current generator, solver, seed, dimension, and size configurations are automatically synced to the browser URL hash for frictionless sharing.
 
-### Play it yourself
+---
 
-- **WASD / arrow keys**, **swipe**, or an **on-screen D-pad** on touch devices.
-- Win overlay with your time and move count.
+## 🚀 Quick Start
 
-### Quality
+No build step is required! You can securely launch it by simply opening `index.html` in your web browser. 
 
-- **High-DPI canvas** — crisp on retina/4K displays.
-- **Responsive** layout that stacks cleanly on phones.
-- **Accessible** — keyboard operable, `aria-live` stats/toasts, visible focus,
-  and `prefers-reduced-motion` support.
-- **Shareable URL** — size, generator, seed, and algorithm are encoded in the
-  URL hash, so any maze can be bookmarked or sent to a friend.
-
-## 🚀 Quick start
-
-No build step required — just open `index.html` in a browser. For live reload
-during development:
+For local development and live-reloads:
 
 ```bash
-npm install      # dev tooling only (eslint, prettier, live-server)
-npm run dev       # start a dev server with live reload
-# or
-npm run serve     # serve the static files
+# Install development tooling (ESLint, Prettier, Live-Server)
+npm install
+
+# Start a local dev server with hot-reload via live-server
+npm run dev
+
+# Alternatively, serve statically
+npm run serve
 ```
 
 ## ⌨️ Controls
 
-| Action | Keys |
-| --- | --- |
-| Move | `W` `A` `S` `D` / arrows / swipe / D-pad |
-| Solve / Stop | `Space` |
-| New maze | `N` |
-| Reset | `R` |
-| Compare all | `C` |
-| Stop / close overlay | `Esc` |
+| Action | Input / Keys |
+| :--- | :--- |
+| **Move (Play)** | `W` `A` `S` `D` / Arrows / Swipe / On-screen D-pad |
+| **Solve / Stop** | `Space` |
+| **Generate New Maze** | `N` |
+| **Reset Maze** | `R` |
+| **Compare Mode** | `C` |
+| **Stop / Close Overlay** | `Esc` |
 
-## 🏗️ Project structure
+## 🏗️ Project Architecture
 
 ```text
 smaze/
-├── index.html                  # Markup + script load order
+├── index.html                   # DOM scaffolding and script orchestration
 ├── src/
 │   ├── css/
-│   │   └── styles.css          # Full stylesheet (dark theme)
+│   │   └── styles.css           # Responsive styling overrides (dark theme)
 │   └── js/
-│       ├── utils.js            # Helpers + seeded RNG (mulberry32) + toasts
-│       ├── data-structures.js  # BinaryHeap, UnionFind
-│       ├── maze-generator.js   # Kruskal / Backtracker / Prim strategies
-│       ├── pathfinding-algorithms.js  # BFS / DFS / Dijkstra / A*
-│       ├── game.js             # Canvas rendering, rAF solve loop, stats
-│       └── app.js              # UI wiring, keyboard/touch, URL state
+│       ├── utils.js             # General helpers, Toasting, Mulberry32 PRNG
+│       ├── grid.js              # High-performance 1D Uint8Array abstraction
+│       ├── data-structures.js   # BinaryHeap, UnionFind standard libraries
+│       ├── maze-generator.js    # Kruskal / Backtracker / Prim implementations
+│       ├── pathfinding-algorithms.js # Search algorithm logic (BFS/DFS/Dijkstra/A*)
+│       ├── renderer-2d.js       # HTML5 Canvas 2D render logic
+│       ├── renderer-3d.js       # Three.js 3D spatial render logic
+│       ├── game.js              # Core `requestAnimationFrame` loop + stats pipeline
+│       └── app.js               # Event bindings, routing logic, config handling
 ├── package.json
 └── README.md
 ```
 
-Scripts load in dependency order:
-`utils.js → data-structures.js → maze-generator.js →
-pathfinding-algorithms.js → game.js → app.js`.
+*Note: Core runtime scripts operate with a strict implicit dependency hierarchy, establishing robust fundamentals before attaching renderer and application logics.*
 
-## 📊 Algorithm notes
+## 📊 Standard Algorithm Matrix
 
-| Algorithm | Shortest path? | Strategy | Visual pattern |
-| --- | --- | --- | --- |
-| **BFS** | ✅ | Explore by distance | Expands as a wavefront |
-| **DFS** | ❌ | Dive deep, then backtrack | Long tendrils |
-| **Dijkstra's** | ✅ | Uniform-cost via min-heap | Even wavefront |
-| **A\*** | ✅ | Heuristic-guided (Manhattan) | Steers toward the goal |
+| Algorithm | Guarantees Shortest Path? | Strategy | Visual Signature |
+| :--- | :---: | :--- | :--- |
+| **Breadth-First Search (BFS)** | ✅ | Uniform distance exploration | Radiating wavefront |
+| **Depth-First Search (DFS)** | ❌ | Dive unconditionally, then backtrack | Long continuous tendrils |
+| **Dijkstra's Algorithm** | ✅ | Uniform-cost bounding (via Min-Heap) | Even/Steady chronological spread |
+| **A\*** | ✅ | Guided by specific heuristic (Manhattan) | Rapid steering toward the objective |
 
-On a unit-weight maze, BFS, Dijkstra's, and A\* all return a shortest path;
-A\* typically explores the fewest nodes. Use **Compare all** to see it.
+*Note: Given the unit-weight uniformity of maze graph distances, BFS, Dijkstra, and A\* consistently find the shortest mathematical path. A\* achieves this with substantially fewer node explorations.*
 
-## 🛠️ Development
+## 🛠️ Development Tools
+
+SMaze includes linting and formatting tooling ensuring clear code quality during forks or extensions.
 
 ```bash
-npm run lint        # ESLint
-npm run lint:fix    # ESLint with autofix
-npm run format      # Prettier
+# Report ESLint issues
+npm run lint
+
+# Auto-fix linting issues 
+npm run lint:fix
+
+# Format codebase using Prettier
+npm run format
 ```
 
 ## 📄 License
 
-MIT — see [LICENSE](LICENSE).
+Distributed under the MIT License. See [LICENSE](LICENSE) for detailed information.
 
 ---
-
-**SMaze** — making pathfinding algorithms visual and interactive. 🎯
+**SMaze** — Making algorithms beautiful, visual, and brilliantly interactive. 🎯
