@@ -1,352 +1,459 @@
 'use strict';
 
 /**
- * Main application entry point for SMaze
- * Handles UI interactions and coordinates game components
+ * Application entry point for SMaze.
+ *
+ * Wires the DOM controls to the Game, owns the single keyboard handler,
+ * renders the live stats panel and compare results, manages the win overlay
+ * and on-screen touch controls, and keeps the maze state shareable via the URL
+ * hash (size, generation algorithm, seed, pathfinding algorithm).
  */
+
+/* global Game, showMessage, debounce, validateMazeSize, formatTime,
+   MAZE_ALGORITHMS */
 
 class App {
   constructor() {
-    this.game = null;
     this.elements = {};
+    this.game = null;
     this.init();
   }
 
-  /**
-   * Initialize the application
-   */
   init() {
     this.cacheElements();
-    this.validateElements();
     this.setupGame();
+    if (!this.game) return;
     this.setupEventListeners();
-    this.updateUI();
+    this.applyStateFromHash();
   }
 
   /**
-   * Cache DOM elements for performance
+   * Cache every interactive element by id. Missing ids are tolerated so the
+   * app degrades gracefully if markup changes.
    */
   cacheElements() {
-    this.elements = {
-      algorithm: document.getElementById('algorithm'),
-      solveBtn: document.getElementById('solveBtn'),
-      stopBtn: document.getElementById('stopBtn'),
-      resetBtn: document.getElementById('resetBtn'),
-      newMazeBtn: document.getElementById('newMazeBtn'),
-      size: document.getElementById('size'),
-      changeSizeBtn: document.getElementById('changeSizeBtn'),
-      timer: document.getElementById('timer'),
-      message: document.getElementById('message')
-    };
-  }
-
-  /**
-   * Validate that all required elements exist
-   */
-  validateElements() {
-    const missingElements = Object.entries(this.elements)
-      .filter(([, element]) => !element)
-      .map(([name]) => name);
-
-    if (missingElements.length > 0) {
-      throw new Error(`Missing required elements: ${missingElements.join(', ')}`);
+    const ids = [
+      'algorithm', 'genAlgorithm', 'speed', 'speedValue', 'size', 'seed',
+      'solveBtn', 'stopBtn', 'resetBtn', 'newMazeBtn', 'changeSizeBtn',
+      'applySeedBtn', 'randomSeedBtn', 'compareBtn',
+      'statStatus', 'statTime', 'statNodes', 'statFrontier', 'statPath',
+      'statExplored', 'statMoves', 'exploreBar',
+      'compareResults', 'compareTableBody',
+      'winOverlay', 'winStats', 'winCloseBtn', 'dpad'
+    ];
+    for (const id of ids) {
+      this.elements[id] = document.getElementById(id);
     }
   }
 
-  /**
-   * Setup the game instance
-   */
   setupGame() {
     try {
-      this.game = new Game('mazeCanvas');
+      this.game = new Game('mazeCanvas', {
+        onStats: (stats) => this.renderStats(stats),
+        onSolveStateChange: (solving) => this.updateControls(solving),
+        onWin: (info) => this.showWin(info)
+      });
     } catch (error) {
       console.error('Failed to initialize game:', error);
-      showMessage('Failed to initialize game. Please refresh the page.');
+      showMessage('Failed to initialize game. Please refresh the page.', 'error', 6000);
     }
   }
 
-  /**
-   * Setup event listeners for UI elements
-   */
+  /* ----------------------------------------------------------------- *
+   * Event wiring
+   * ----------------------------------------------------------------- */
+
   setupEventListeners() {
-    // Algorithm solving
-    this.elements.solveBtn.addEventListener('click', () => {
-      this.handleSolveClick();
-    });
+    const el = this.elements;
 
-    // Stop solving
-    this.elements.stopBtn.addEventListener('click', () => {
-      this.handleStopClick();
-    });
+    el.solveBtn.addEventListener('click', () => this.handleSolve());
+    el.stopBtn.addEventListener('click', () => this.handleStop());
+    el.resetBtn.addEventListener('click', () => this.handleReset());
+    el.newMazeBtn.addEventListener('click', () => this.handleNewMaze());
+    el.changeSizeBtn.addEventListener('click', () => this.handleSizeChange());
 
-    // Reset player position
-    this.elements.resetBtn.addEventListener('click', () => {
-      this.handleResetClick();
-    });
+    if (el.compareBtn) el.compareBtn.addEventListener('click', () => this.handleCompare());
+    if (el.applySeedBtn) el.applySeedBtn.addEventListener('click', () => this.handleApplySeed());
+    if (el.randomSeedBtn) el.randomSeedBtn.addEventListener('click', () => this.handleRandomSeed());
 
-    // Generate new maze
-    this.elements.newMazeBtn.addEventListener('click', () => {
-      this.handleNewMazeClick();
-    });
+    if (el.genAlgorithm) {
+      el.genAlgorithm.addEventListener('change', () => this.handleGenAlgorithmChange());
+    }
 
-    // Change maze size with debouncing
-    this.elements.changeSizeBtn.addEventListener('click', () => {
-      this.handleSizeChangeClick();
-    });
+    if (el.speed) {
+      el.speed.addEventListener('input', () => {
+        const value = parseInt(el.speed.value, 10);
+        this.game.setSpeed(value);
+        if (el.speedValue) el.speedValue.textContent = `${value}`;
+      });
+    }
 
-    // Add keyboard shortcut hints
-    this.setupKeyboardShortcuts();
+    if (el.winCloseBtn) {
+      el.winCloseBtn.addEventListener('click', () => {
+        this.hideWin();
+        this.game.resetGame(); // Return the player to the start for a fresh run.
+      });
+    }
 
-    // Handle window resize
+    this.setupKeyboard();
+    this.setupTouchControls();
+
     window.addEventListener('resize', debounce(() => {
-      this.handleWindowResize();
-    }, 250));
-
-    // Handle visibility change (pause when tab is not active)
-    document.addEventListener('visibilitychange', () => {
-      this.handleVisibilityChange();
-    });
+      if (this.game && !this.game.isCurrentlyAutoSolving()) {
+        this.game.setupCanvas();
+      }
+    }, 200));
   }
 
   /**
-   * Setup keyboard shortcuts
+   * The single keyboard entry point: movement plus action shortcuts.
    */
-  setupKeyboardShortcuts() {
+  setupKeyboard() {
     document.addEventListener('keydown', (event) => {
-      // Only process shortcuts if not typing in input fields
-      if (event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT') {
+      const tag = event.target.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+
+      const move = this.movementForKey(event.key);
+      if (move) {
+        event.preventDefault();
+        this.game.move(move.dx, move.dy);
         return;
       }
 
       switch (event.code) {
         case 'Space':
           event.preventDefault();
-          if (this.game.isCurrentlyAutoSolving()) {
-            this.handleStopClick();
-          } else {
-            this.handleSolveClick();
-          }
+          this.game.isCurrentlyAutoSolving() ? this.handleStop() : this.handleSolve();
           break;
         case 'KeyR':
           event.preventDefault();
-          this.handleResetClick();
+          this.handleReset();
           break;
         case 'KeyN':
           event.preventDefault();
-          this.handleNewMazeClick();
+          this.handleNewMaze();
+          break;
+        case 'KeyC':
+          event.preventDefault();
+          this.handleCompare();
           break;
         case 'Escape':
           event.preventDefault();
-          this.handleStopClick();
+          if (this.elements.winOverlay && !this.elements.winOverlay.hidden) {
+            this.hideWin();
+          } else {
+            this.handleStop();
+          }
           break;
       }
     });
   }
 
   /**
-   * Handle solve button click
+   * Map a key to a movement delta (WASD or arrow keys).
+   * @returns {{dx: number, dy: number}|null}
    */
-  handleSolveClick() {
-    if (this.game.isCurrentlyAutoSolving()) {
-      showMessage('Algorithm is already running!');
+  movementForKey(key) {
+    const map = {
+      w: { dx: 0, dy: -1 }, ArrowUp: { dx: 0, dy: -1 },
+      s: { dx: 0, dy: 1 }, ArrowDown: { dx: 0, dy: 1 },
+      a: { dx: -1, dy: 0 }, ArrowLeft: { dx: -1, dy: 0 },
+      d: { dx: 1, dy: 0 }, ArrowRight: { dx: 1, dy: 0 }
+    };
+    return map[key] || map[key.toLowerCase?.()] || null;
+  }
+
+  /**
+   * On-screen D-pad plus swipe gestures for touch devices.
+   */
+  setupTouchControls() {
+    if (this.elements.dpad) {
+      this.elements.dpad.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-dir]');
+        if (!button) return;
+        const deltas = {
+          up: { dx: 0, dy: -1 }, down: { dx: 0, dy: 1 },
+          left: { dx: -1, dy: 0 }, right: { dx: 1, dy: 0 }
+        };
+        const delta = deltas[button.dataset.dir];
+        if (delta) this.game.move(delta.dx, delta.dy);
+      });
+    }
+
+    const canvas = this.game.canvas;
+    let startX = 0;
+    let startY = 0;
+    canvas.addEventListener('touchstart', (event) => {
+      const touch = event.changedTouches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+    }, { passive: true });
+
+    canvas.addEventListener('touchend', (event) => {
+      const touch = event.changedTouches[0];
+      const dx = touch.clientX - startX;
+      const dy = touch.clientY - startY;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+      if (Math.max(absX, absY) < 24) return; // Ignore taps.
+      if (absX > absY) {
+        this.game.move(dx > 0 ? 1 : -1, 0);
+      } else {
+        this.game.move(0, dy > 0 ? 1 : -1);
+      }
+    }, { passive: true });
+  }
+
+  /* ----------------------------------------------------------------- *
+   * Action handlers
+   * ----------------------------------------------------------------- */
+
+  handleSolve() {
+    if (this.game.isCurrentlyAutoSolving()) return;
+    this.hideCompare();
+    this.game.startAutoSolving(this.elements.algorithm.value);
+  }
+
+  handleStop() {
+    if (!this.game.isCurrentlyAutoSolving()) return;
+    this.game.stopAutoSolving();
+    showMessage('Solver stopped', 'info');
+  }
+
+  handleReset() {
+    this.game.resetGame();
+    this.hideCompare();
+    showMessage('Maze reset', 'info');
+  }
+
+  handleNewMaze() {
+    this.hideCompare();
+    this.game.generateNewMaze({ algorithm: this.elements.genAlgorithm?.value, seed: null });
+    this.syncSeedInput();
+    this.writeHash();
+    showMessage('New maze generated', 'info');
+  }
+
+  handleSizeChange() {
+    const requested = parseInt(this.elements.size.value, 10);
+    const size = validateMazeSize(requested);
+    if (size !== requested) {
+      this.elements.size.value = size;
+      showMessage(`Size adjusted to ${size} (odd, 11–99)`, 'info');
+    }
+    this.hideCompare();
+    this.game.mazeGenerator.size = size;
+    this.game.generateNewMaze({ algorithm: this.elements.genAlgorithm?.value, seed: null });
+    this.game.setupCanvas();
+    this.syncSeedInput();
+    this.writeHash();
+  }
+
+  handleGenAlgorithmChange() {
+    this.hideCompare();
+    this.game.generateNewMaze({ algorithm: this.elements.genAlgorithm.value, seed: null });
+    this.syncSeedInput();
+    this.writeHash();
+  }
+
+  handleApplySeed() {
+    const seed = parseInt(this.elements.seed.value, 10);
+    if (Number.isNaN(seed)) {
+      showMessage('Enter a numeric seed', 'error');
       return;
     }
-
-    const algorithmType = this.elements.algorithm.value;
-    this.game.startAutoSolving(algorithmType);
-    this.updateUI();
+    this.hideCompare();
+    this.game.generateNewMaze({ algorithm: this.elements.genAlgorithm?.value, seed });
+    this.writeHash();
+    showMessage(`Maze regenerated from seed ${seed}`, 'info');
   }
 
-  /**
-   * Handle stop button click
-   */
-  handleStopClick() {
-    this.game.stopAutoSolving();
-    this.updateUI();
-    showMessage('Algorithm stopped');
+  handleRandomSeed() {
+    this.hideCompare();
+    this.game.generateNewMaze({ algorithm: this.elements.genAlgorithm?.value, seed: null });
+    this.syncSeedInput();
+    this.writeHash();
   }
 
-  /**
-   * Handle reset button click
-   */
-  handleResetClick() {
-    this.game.resetGame();
-    this.updateUI();
-    showMessage('Player position reset');
-  }
-
-  /**
-   * Handle new maze button click
-   */
-  handleNewMazeClick() {
-    this.game.generateNewMaze();
-    this.updateUI();
-    showMessage('New maze generated');
-  }
-
-  /**
-   * Handle maze size change
-   */
-  handleSizeChangeClick() {
-    const newSize = this.validateSizeInput();
-    if (newSize !== null) {
-      this.game.updateMazeSize(newSize);
-      this.updateUI();
-      showMessage(`Maze size changed to ${newSize}x${newSize}`);
+  handleCompare() {
+    if (this.game.isCurrentlyAutoSolving()) {
+      showMessage('Stop the solver before comparing', 'info');
+      return;
     }
+    const results = this.game.compareAlgorithms();
+    this.renderCompare(results);
   }
 
-  /**
-   * Validate and return maze size input
-   * @returns {number|null} Valid size or null if invalid
-   */
-  validateSizeInput() {
-    const inputValue = this.elements.size.value;
-    const size = validateMazeSize(inputValue);
-    
-    if (size !== parseInt(inputValue, 10)) {
-      this.elements.size.value = size;
-      showMessage(`Size adjusted to ${size} (must be odd, 10-100)`);
-    }
-    
-    return size;
-  }
+  /* ----------------------------------------------------------------- *
+   * UI rendering
+   * ----------------------------------------------------------------- */
 
   /**
-   * Handle window resize
+   * Reflect the current metrics in the stats panel.
+   * @param {Object} stats
    */
-  handleWindowResize() {
-    // Re-render game to adjust to new window size
-    if (this.game) {
-      this.game.render();
-    }
-  }
+  renderStats(stats) {
+    const el = this.elements;
+    const set = (node, value) => { if (node) node.textContent = value; };
 
-  /**
-   * Handle visibility change (tab switching)
-   */
-  handleVisibilityChange() {
-    if (document.hidden && this.game && this.game.isCurrentlyAutoSolving()) {
-      // Optionally pause solving when tab is not visible
-      // this.game.stopAutoSolving();
-      // showMessage('Algorithm paused (tab not visible)');
-    }
-  }
-
-  /**
-   * Update UI state based on game state
-   */
-  updateUI() {
-    if (!this.game) return;
-
-    const isAutoSolving = this.game.isCurrentlyAutoSolving();
-    
-    // Update button states
-    this.elements.solveBtn.disabled = isAutoSolving;
-    this.elements.stopBtn.disabled = !isAutoSolving;
-    this.elements.algorithm.disabled = isAutoSolving;
-    this.elements.changeSizeBtn.disabled = isAutoSolving;
-    this.elements.size.disabled = isAutoSolving;
-
-    // Update button text and appearance
-    if (isAutoSolving) {
-      this.elements.solveBtn.textContent = 'Solving...';
-      this.elements.solveBtn.style.opacity = '0.6';
-    } else {
-      this.elements.solveBtn.textContent = 'Solve Maze';
-      this.elements.solveBtn.style.opacity = '1';
-    }
-
-    // Update accessibility attributes
-    this.elements.solveBtn.setAttribute('aria-disabled', isAutoSolving);
-    this.elements.stopBtn.setAttribute('aria-disabled', !isAutoSolving);
-  }
-
-  /**
-   * Get algorithm display name
-   * @param {string} algorithmType - Algorithm type
-   * @returns {string} Display name
-   */
-  getAlgorithmDisplayName(algorithmType) {
-    const names = {
-      'bfs': 'Breadth-First Search',
-      'dfs': 'Depth-First Search',
-      'dijkstra': "Dijkstra's Algorithm",
-      'astar': 'A* Algorithm'
+    const statusLabels = {
+      ready: 'Ready', playing: 'Playing', solving: 'Solving…',
+      solved: 'Solved', 'no-solution': 'No solution', won: 'You won!'
     };
-    return names[algorithmType] || algorithmType;
-  }
+    set(el.statStatus, statusLabels[stats.status] || 'Ready');
+    set(el.statTime, formatTime(stats.timeSeconds));
+    set(el.statNodes, stats.nodesExplored.toLocaleString());
+    set(el.statFrontier, stats.frontier.toLocaleString());
+    set(el.statPath, stats.pathLength ? stats.pathLength.toLocaleString() : '—');
+    set(el.statExplored, `${stats.exploredPct.toFixed(1)}%`);
+    set(el.statMoves, stats.moves.toLocaleString());
 
-  /**
-   * Handle application errors
-   * @param {Error} error - Error object
-   */
-  handleError(error) {
-    console.error('Application error:', error);
-    showMessage('An error occurred. Please refresh the page.');
-  }
-
-  /**
-   * Get current application state
-   * @returns {Object} Current state
-   */
-  getState() {
-    return {
-      algorithm: this.elements.algorithm.value,
-      mazeSize: parseInt(this.elements.size.value, 10),
-      isAutoSolving: this.game ? this.game.isCurrentlyAutoSolving() : false,
-      playerPosition: this.game ? this.game.getPlayerPosition() : null
-    };
-  }
-
-  /**
-   * Cleanup application resources
-   */
-  cleanup() {
-    if (this.game) {
-      this.game.stopAutoSolving();
+    if (el.exploreBar) {
+      el.exploreBar.style.width = `${Math.min(100, stats.exploredPct)}%`;
     }
-    
-    // Remove event listeners if needed for SPA scenarios
-    // This would be expanded in a more complex application
+  }
+
+  /**
+   * Enable/disable controls based on whether the solver is running.
+   * @param {boolean} solving
+   */
+  updateControls(solving) {
+    const el = this.elements;
+    const lock = [
+      el.solveBtn, el.algorithm, el.genAlgorithm, el.changeSizeBtn,
+      el.size, el.seed, el.applySeedBtn, el.randomSeedBtn,
+      el.newMazeBtn, el.compareBtn
+    ];
+    for (const node of lock) {
+      if (node) node.disabled = solving;
+    }
+    if (el.stopBtn) el.stopBtn.disabled = !solving;
+    if (el.solveBtn) el.solveBtn.textContent = solving ? 'Solving…' : 'Solve';
+  }
+
+  /**
+   * Render the compare-mode results table, highlighting the shortest path
+   * and the fewest nodes explored.
+   * @param {Array} results
+   */
+  renderCompare(results) {
+    const tbody = this.elements.compareTableBody;
+    if (!tbody || !this.elements.compareResults) return;
+
+    const minPath = Math.min(...results.filter(r => r.found).map(r => r.pathLength));
+    const minNodes = Math.min(...results.map(r => r.nodesExplored));
+
+    tbody.innerHTML = '';
+    for (const r of results) {
+      const row = document.createElement('tr');
+      const path = r.found ? r.pathLength : '—';
+      row.innerHTML = `
+        <td>${r.name}</td>
+        <td class="${r.found && r.pathLength === minPath ? 'is-best' : ''}">${path}</td>
+        <td class="${r.nodesExplored === minNodes ? 'is-best' : ''}">${r.nodesExplored.toLocaleString()}</td>
+        <td>${r.timeMs.toFixed(2)} ms</td>`;
+      tbody.appendChild(row);
+    }
+    this.elements.compareResults.hidden = false;
+  }
+
+  hideCompare() {
+    if (this.elements.compareResults) this.elements.compareResults.hidden = true;
+  }
+
+  /**
+   * Show the win overlay with final stats.
+   * @param {{timeSeconds: number, moves: number}} info
+   */
+  showWin(info) {
+    const overlay = this.elements.winOverlay;
+    if (!overlay) {
+      showMessage('Congratulations! You solved the maze!', 'success');
+      return;
+    }
+    if (this.elements.winStats) {
+      this.elements.winStats.textContent =
+        `Time ${formatTime(info.timeSeconds)} · ${info.moves} moves`;
+    }
+    overlay.hidden = false;
+    requestAnimationFrame(() => overlay.classList.add('is-visible'));
+  }
+
+  hideWin() {
+    const overlay = this.elements.winOverlay;
+    if (!overlay) return;
+    overlay.classList.remove('is-visible');
+    setTimeout(() => { overlay.hidden = true; }, 300);
+  }
+
+  /* ----------------------------------------------------------------- *
+   * Seed + URL hash state
+   * ----------------------------------------------------------------- */
+
+  syncSeedInput() {
+    if (this.elements.seed) {
+      this.elements.seed.value = this.game.mazeGenerator.getSeed();
+    }
+  }
+
+  /**
+   * Encode the current state into location.hash for sharing/bookmarking.
+   */
+  writeHash() {
+    const params = new URLSearchParams({
+      size: this.game.mazeGenerator.getSize(),
+      gen: this.game.mazeGenerator.getAlgorithm(),
+      seed: this.game.mazeGenerator.getSeed(),
+      algo: this.elements.algorithm.value
+    });
+    history.replaceState(null, '', `#${params.toString()}`);
+  }
+
+  /**
+   * Restore state from location.hash on load, then sync controls + the maze.
+   */
+  applyStateFromHash() {
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const el = this.elements;
+
+    const size = params.has('size') ? validateMazeSize(parseInt(params.get('size'), 10)) : null;
+    const gen = params.get('gen');
+    const seedRaw = params.get('seed');
+    const algo = params.get('algo');
+
+    if (size && el.size) el.size.value = size;
+    if (gen && el.genAlgorithm && MAZE_ALGORITHMS.includes(gen)) el.genAlgorithm.value = gen;
+    if (algo && el.algorithm) el.algorithm.value = algo;
+    if (el.speed) {
+      this.game.setSpeed(parseInt(el.speed.value, 10));
+      if (el.speedValue) el.speedValue.textContent = el.speed.value;
+    }
+
+    const seed = seedRaw !== null && seedRaw !== '' ? parseInt(seedRaw, 10) : null;
+    if (size) this.game.mazeGenerator.size = size;
+    this.game.generateNewMaze({
+      algorithm: el.genAlgorithm?.value,
+      seed: Number.isNaN(seed) ? null : seed
+    });
+    this.game.setupCanvas();
+    this.syncSeedInput();
+    this.writeHash();
   }
 }
 
-// Initialize application when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   try {
-    const app = new App();
-    
-    // Make app globally available for debugging
-    if (typeof window !== 'undefined') {
-      window.smazeApp = app;
-    }
-    
-    console.log('SMaze application initialized successfully');
+    window.smazeApp = new App();
   } catch (error) {
-    console.error('Failed to initialize SMaze application:', error);
-    
-    // Show fallback error message
-    const messageEl = document.getElementById('message');
-    if (messageEl) {
-      messageEl.textContent = 'Failed to initialize application. Please refresh the page.';
-      messageEl.style.display = 'block';
-      messageEl.style.opacity = '1';
-    }
+    console.error('Failed to initialize SMaze:', error);
+    showMessage('Failed to initialize application. Please refresh.', 'error', 6000);
   }
 });
 
-// Handle unhandled errors
 window.addEventListener('error', (event) => {
   console.error('Unhandled error:', event.error);
 });
 
-// Handle unhandled promise rejections
-window.addEventListener('unhandledrejection', (event) => {
-  console.error('Unhandled promise rejection:', event.reason);
-});
-
-// Export for potential module use
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = App;
 }

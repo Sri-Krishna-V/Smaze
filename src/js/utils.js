@@ -5,13 +5,41 @@
  */
 
 /**
- * Shuffles an array in place using Fisher-Yates algorithm
- * @param {Array} array - The array to shuffle
- * @returns {Array} The shuffled array
+ * Creates a seeded pseudo-random number generator (mulberry32).
+ *
+ * Returns a function producing floats in [0, 1). Seeding makes maze
+ * generation reproducible, which powers the shareable-seed feature.
+ * @param {number} seed - 32-bit unsigned integer seed.
+ * @returns {() => number} A deterministic random function.
  */
-function shuffleArray(array) {
+function mulberry32(seed) {
+  let state = seed >>> 0;
+  return function next() {
+    state |= 0;
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Generates a random 32-bit seed suitable for mulberry32.
+ * @returns {number} A non-negative integer seed.
+ */
+function randomSeed() {
+  return Math.floor(Math.random() * 0xffffffff) >>> 0;
+}
+
+/**
+ * Shuffles an array in place using the Fisher-Yates algorithm.
+ * @param {Array} array - The array to shuffle.
+ * @param {() => number} [rng=Math.random] - Random source (e.g. a seeded RNG).
+ * @returns {Array} The shuffled array.
+ */
+function shuffleArray(array, rng = Math.random) {
   for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rng() * (i + 1));
     [array[i], array[j]] = [array[j], array[i]];
   }
   return array;
@@ -39,18 +67,33 @@ function calculatePathLength(path) {
 }
 
 /**
- * Shows a message with animation
- * @param {string} text - Message text to display
+ * Shows a transient toast notification, stacked in a corner so it never
+ * covers the maze. Toasts auto-dismiss and are announced to screen readers
+ * via the container's aria-live region.
+ * @param {string} text - Message text to display.
+ * @param {('info'|'success'|'error')} [type='info'] - Visual variant.
+ * @param {number} [duration=2600] - Time in ms before auto-dismiss.
  */
-function showMessage(text) {
-  const messageDiv = document.getElementById('message');
-  if (!messageDiv) return;
-  
-  messageDiv.textContent = text;
-  messageDiv.style.animation = 'none';
-  // Force reflow
-  void messageDiv.offsetWidth;
-  messageDiv.style.animation = '';
+function showMessage(text, type = 'info', duration = 2600) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast--${type}`;
+  toast.textContent = text;
+  container.appendChild(toast);
+
+  // Trigger enter animation on the next frame.
+  requestAnimationFrame(() => toast.classList.add('toast--visible'));
+
+  const remove = () => {
+    toast.classList.remove('toast--visible');
+    toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+    // Fallback removal if the transition never fires (e.g. reduced motion).
+    setTimeout(() => toast.remove(), 400);
+  };
+
+  setTimeout(remove, duration);
 }
 
 /**
@@ -78,8 +121,8 @@ function debounce(func, wait) {
  */
 function validateMazeSize(size) {
   const parsed = parseInt(size, 10);
-  if (isNaN(parsed) || parsed < 10) return 11;
-  if (parsed > 100) return 99;
+  if (isNaN(parsed) || parsed < 11) return 11;
+  if (parsed > 99) return 99;
   return parsed % 2 === 0 ? parsed + 1 : parsed;
 }
 
@@ -110,12 +153,12 @@ function getDirections(x, y) {
 }
 
 /**
- * Formats time in seconds to display format
- * @param {number} seconds - Time in seconds
- * @returns {string} Formatted time string
+ * Formats a duration in seconds for display.
+ * @param {number} seconds - Time in seconds.
+ * @returns {string} Formatted value, e.g. "1.23s".
  */
 function formatTime(seconds) {
-  return `Time: ${seconds.toFixed(2)}s`;
+  return `${seconds.toFixed(2)}s`;
 }
 
 /**
@@ -134,6 +177,8 @@ function create2DArray(rows, cols, defaultValue = 0) {
 // Export functions for potential future module use
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
+    mulberry32,
+    randomSeed,
     shuffleArray,
     manhattanDistance,
     calculatePathLength,
