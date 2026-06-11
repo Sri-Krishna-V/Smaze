@@ -140,8 +140,10 @@ class UnionFind {
    * @param {number} count - Number of distinct elements (ids 0..count-1).
    */
   constructor(count) {
-    this.parent = new Array(count);
-    this.rank = new Array(count).fill(0);
+    // Typed arrays so union-find over millions of room cells stays compact.
+    // rank never exceeds ~log2(count) < 32, so a single byte per node suffices.
+    this.parent = new Int32Array(count);
+    this.rank = new Uint8Array(count);
     for (let i = 0; i < count; i++) {
       this.parent[i] = i;
     }

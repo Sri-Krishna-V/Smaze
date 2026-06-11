@@ -97,6 +97,13 @@
       <section class="panel controls" aria-label="Maze controls">
         <h2>Maze</h2>
         <div class="field">
+          <label for="dimensions">Dimensions</label>
+          <select id="dimensions">
+            <option value="2">2D (flat)</option>
+            <option value="3">3D (volume)</option>
+          </select>
+        </div>
+        <div class="field">
           <label for="genAlgorithm">Generation algorithm</label>
           <select id="genAlgorithm">
             <option value="kruskal">Kruskal's (balanced)</option>
@@ -106,8 +113,14 @@
         </div>
         <div class="field field--inline">
           <label for="size">Size</label>
-          <input type="number" id="size" value="25" min="11" max="99" step="2">
+          <input type="number" id="size" value="25" min="11" max="7071" step="2">
           <button id="changeSizeBtn" type="button" class="btn btn--sm">Apply</button>
+        </div>
+        <div class="field field--inline" aria-label="View controls">
+          <label>View</label>
+          <button id="zoomInBtn" type="button" class="btn btn--sm" aria-label="Zoom in">Zoom +</button>
+          <button id="zoomOutBtn" type="button" class="btn btn--sm" aria-label="Zoom out">Zoom −</button>
+          <button id="fitViewBtn" type="button" class="btn btn--sm" aria-label="Fit maze to view">Fit</button>
         </div>
         <div class="field field--inline">
           <label for="seed">Seed</label>
@@ -160,11 +173,17 @@
     <p>SMaze — educational pathfinding visualization. Built with vanilla JavaScript.</p>
   </footer>
 
+  <!-- Three.js (3D renderer) — loaded before renderer-3d.js. -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+
   <!-- Scripts: load order matters (each layer depends on the previous). -->
   <script src="src/js/utils.js"></script>
+  <script src="src/js/grid.js"></script>
   <script src="src/js/data-structures.js"></script>
   <script src="src/js/maze-generator.js"></script>
   <script src="src/js/pathfinding-algorithms.js"></script>
+  <script src="src/js/renderer-2d.js"></script>
+  <script src="src/js/renderer-3d.js"></script>
   <script src="src/js/game.js"></script>
   <script src="src/js/app.js"></script>
 </body>

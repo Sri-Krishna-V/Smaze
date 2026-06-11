@@ -46,7 +46,7 @@ function shuffleArray(array, rng = Math.random) {
 }
 
 /**
- * Calculates Manhattan distance between two points
+ * Calculates Manhattan distance between two 2D points.
  * @param {number} x1 - X coordinate of first point
  * @param {number} y1 - Y coordinate of first point
  * @param {number} x2 - X coordinate of second point
@@ -55,6 +55,20 @@ function shuffleArray(array, rng = Math.random) {
  */
 function manhattanDistance(x1, y1, x2, y2) {
   return Math.abs(x1 - x2) + Math.abs(y1 - y2);
+}
+
+/**
+ * Manhattan distance between two grid cells by linear index, valid for 2D and
+ * 3D grids. Used as the admissible A* heuristic in both dimensions.
+ * @param {Grid} grid - The grid the indices belong to.
+ * @param {number} i - First cell index.
+ * @param {number} j - Second cell index.
+ * @returns {number} Manhattan distance in cells.
+ */
+function manhattanIndex(grid, i, j) {
+  const a = grid.coords(i);
+  const b = grid.coords(j);
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y) + Math.abs(a.z - b.z);
 }
 
 /**
@@ -115,14 +129,40 @@ function debounce(func, wait) {
 }
 
 /**
- * Validates maze size input
- * @param {number} size - Size to validate
- * @returns {number} Valid maze size (always odd)
+ * Total-cell budget. Caps `size ^ dims` so a maze (plus its pathfinding side
+ * tables) stays within a safe browser memory envelope. At ~10 bytes/cell of
+ * peak working set during a solve, 50M cells ≈ 500 MB. This yields a 2D side of
+ * ~7071 and a 3D side of ~368 — the practical ceilings for "as large as memory
+ * allows."
  */
-function validateMazeSize(size) {
+const MAX_CELLS = 50_000_000;
+
+/**
+ * Largest odd side length that keeps `side ^ dims` within `maxCells`.
+ * @param {2|3} dims - Number of dimensions.
+ * @param {number} [maxCells=MAX_CELLS] - Cell budget.
+ * @returns {number} Maximum odd side length (>= 11).
+ */
+function maxMazeSide(dims, maxCells = MAX_CELLS) {
+  const raw = Math.floor(Math.pow(maxCells, 1 / dims));
+  const odd = raw % 2 === 0 ? raw - 1 : raw;
+  return Math.max(11, odd);
+}
+
+/**
+ * Validates and normalizes a maze size: forces odd and clamps to
+ * [11, maxMazeSide(dims)] so the maze fits the memory budget.
+ * @param {number} size - Requested size.
+ * @param {{dims?: 2|3, maxCells?: number}} [options]
+ * @returns {number} Valid, odd maze size.
+ */
+function validateMazeSize(size, options = {}) {
+  const dims = options.dims === 3 ? 3 : 2;
+  const upper = maxMazeSide(dims, options.maxCells);
+
   const parsed = parseInt(size, 10);
   if (isNaN(parsed) || parsed < 11) return 11;
-  if (parsed > 99) return 99;
+  if (parsed >= upper) return upper; // upper is already odd
   return parsed % 2 === 0 ? parsed + 1 : parsed;
 }
 
@@ -181,9 +221,12 @@ if (typeof module !== 'undefined' && module.exports) {
     randomSeed,
     shuffleArray,
     manhattanDistance,
+    manhattanIndex,
     calculatePathLength,
     showMessage,
     debounce,
+    MAX_CELLS,
+    maxMazeSide,
     validateMazeSize,
     isValidCoordinate,
     getDirections,

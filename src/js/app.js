@@ -9,7 +9,7 @@
  * hash (size, generation algorithm, seed, pathfinding algorithm).
  */
 
-/* global Game, showMessage, debounce, validateMazeSize, formatTime,
+/* global Game, showMessage, debounce, validateMazeSize, maxMazeSide, formatTime,
    MAZE_ALGORITHMS */
 
 class App {
@@ -34,6 +34,7 @@ class App {
   cacheElements() {
     const ids = [
       'algorithm', 'genAlgorithm', 'speed', 'speedValue', 'size', 'seed',
+      'dimensions', 'zoomInBtn', 'zoomOutBtn', 'fitViewBtn',
       'solveBtn', 'stopBtn', 'resetBtn', 'newMazeBtn', 'changeSizeBtn',
       'applySeedBtn', 'randomSeedBtn', 'compareBtn',
       'statStatus', 'statTime', 'statNodes', 'statFrontier', 'statPath',
@@ -79,6 +80,14 @@ class App {
     if (el.genAlgorithm) {
       el.genAlgorithm.addEventListener('change', () => this.handleGenAlgorithmChange());
     }
+    if (el.dimensions) {
+      el.dimensions.addEventListener('change', () => this.handleDimensionsChange());
+    }
+
+    if (el.zoomInBtn) el.zoomInBtn.addEventListener('click', () => this.game.zoomBy(1.4));
+    if (el.zoomOutBtn) el.zoomOutBtn.addEventListener('click', () => this.game.zoomBy(1 / 1.4));
+    if (el.fitViewBtn) el.fitViewBtn.addEventListener('click', () => this.game.fitView());
+    this.setupViewGestures();
 
     if (el.speed) {
       el.speed.addEventListener('input', () => {
@@ -204,6 +213,37 @@ class App {
     }, { passive: true });
   }
 
+  /**
+   * Mouse-wheel zoom and click-drag pan on the canvas (large-maze navigation).
+   */
+  setupViewGestures() {
+    const canvas = this.game.canvas;
+
+    canvas.addEventListener('wheel', (event) => {
+      if (!this.game.renderer || !this.game.renderer.zoomBy) return;
+      event.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const factor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
+      this.game.zoomBy(factor, event.clientX - rect.left, event.clientY - rect.top);
+    }, { passive: false });
+
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    canvas.addEventListener('mousedown', (event) => {
+      dragging = true;
+      lastX = event.clientX;
+      lastY = event.clientY;
+    });
+    window.addEventListener('mousemove', (event) => {
+      if (!dragging || !this.game.renderer || !this.game.renderer.panBy) return;
+      this.game.panBy(event.clientX - lastX, event.clientY - lastY);
+      lastX = event.clientX;
+      lastY = event.clientY;
+    });
+    window.addEventListener('mouseup', () => { dragging = false; });
+  }
+
   /* ----------------------------------------------------------------- *
    * Action handlers
    * ----------------------------------------------------------------- */
@@ -235,11 +275,12 @@ class App {
   }
 
   handleSizeChange() {
+    const dims = this.game.dims;
     const requested = parseInt(this.elements.size.value, 10);
-    const size = validateMazeSize(requested);
+    const size = validateMazeSize(requested, { dims });
     if (size !== requested) {
       this.elements.size.value = size;
-      showMessage(`Size adjusted to ${size} (odd, 11–99)`, 'info');
+      showMessage(`Size adjusted to ${size} (odd, 11–${maxMazeSide(dims)})`, 'info');
     }
     this.hideCompare();
     this.game.mazeGenerator.size = size;
@@ -254,6 +295,30 @@ class App {
     this.game.generateNewMaze({ algorithm: this.elements.genAlgorithm.value, seed: null });
     this.syncSeedInput();
     this.writeHash();
+  }
+
+  /**
+   * Switch between 2D and 3D. Re-clamps the size input to the new dimension's
+   * memory budget, rebuilds the generator/renderer, and regenerates.
+   */
+  handleDimensionsChange() {
+    const dims = parseInt(this.elements.dimensions.value, 10) === 3 ? 3 : 2;
+    this.hideCompare();
+    this.updateSizeBounds(dims);
+    this.game.setDimensions(dims);
+    this.syncSeedInput();
+    this.writeHash();
+    showMessage(`Switched to ${dims}D`, 'info');
+  }
+
+  /** Update the size input's max (and clamp its value) for the given dimension. */
+  updateSizeBounds(dims) {
+    if (!this.elements.size) return;
+    const upper = maxMazeSide(dims);
+    this.elements.size.max = upper;
+    if (parseInt(this.elements.size.value, 10) > upper) {
+      this.elements.size.value = upper;
+    }
   }
 
   handleApplySeed() {
@@ -322,7 +387,7 @@ class App {
     const lock = [
       el.solveBtn, el.algorithm, el.genAlgorithm, el.changeSizeBtn,
       el.size, el.seed, el.applySeedBtn, el.randomSeedBtn,
-      el.newMazeBtn, el.compareBtn
+      el.newMazeBtn, el.compareBtn, el.dimensions
     ];
     for (const node of lock) {
       if (node) node.disabled = solving;
@@ -401,6 +466,7 @@ class App {
    */
   writeHash() {
     const params = new URLSearchParams({
+      dims: this.game.dims,
       size: this.game.mazeGenerator.getSize(),
       gen: this.game.mazeGenerator.getAlgorithm(),
       seed: this.game.mazeGenerator.getSeed(),
@@ -416,10 +482,16 @@ class App {
     const params = new URLSearchParams(window.location.hash.slice(1));
     const el = this.elements;
 
-    const size = params.has('size') ? validateMazeSize(parseInt(params.get('size'), 10)) : null;
+    const dims = parseInt(params.get('dims'), 10) === 3 ? 3 : 2;
+    const size = params.has('size') ? validateMazeSize(parseInt(params.get('size'), 10), { dims }) : null;
     const gen = params.get('gen');
     const seedRaw = params.get('seed');
     const algo = params.get('algo');
+
+    // Apply dimensions first so size bounds and the renderer match.
+    if (el.dimensions) el.dimensions.value = String(dims);
+    this.updateSizeBounds(dims);
+    if (dims !== this.game.dims) this.game.setDimensions(dims);
 
     if (size && el.size) el.size.value = size;
     if (gen && el.genAlgorithm && MAZE_ALGORITHMS.includes(gen)) el.genAlgorithm.value = gen;
