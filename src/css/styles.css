@@ -11,6 +11,11 @@
   padding: 0;
 }
 
+/* The hidden attribute must always win, even over author display rules.
+   Without this, an element like .win-overlay (display: grid) stays laid out
+   while [hidden] is set, covering the page and swallowing every click. */
+[hidden] { display: none !important; }
+
 :root {
   /* Type */
   --font-ui: 'Outfit', system-ui, sans-serif;
